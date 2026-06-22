@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { fetchProjectDetail, updateProjectStatus, updateProjectHealth, createMilestone, updateMilestone } from '../lib/projects'
+import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone } from '../lib/projects'
+import { requestStageAdvance, resolveStageAdvance, fetchAuditLog } from '../lib/governance'
 import { fetchTeams, fetchProfiles, fetchNotifications, markNotificationRead } from '../lib/tasks'
+import { supabase } from '../lib/supabase'
 import { healthColor } from '../lib/teamColors'
 import Shell from '../components/Shell'
 
@@ -17,6 +19,8 @@ export default function ProjectDetail() {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const [project, setProject] = useState(null)
+  const [pendingStageRequest, setPendingStageRequest] = useState(null)
+  const [auditLog, setAuditLog] = useState([])
   const [teams, setTeams] = useState([])
   const [people, setPeople] = useState([])
   const [notifications, setNotifications] = useState([])
@@ -31,6 +35,8 @@ export default function ProjectDetail() {
   const [milestoneName, setMilestoneName] = useState('')
   const [milestoneOwner, setMilestoneOwner] = useState('')
   const [milestoneDate, setMilestoneDate] = useState('')
+  const [showAdvanceForm, setShowAdvanceForm] = useState(false)
+  const [advanceNote, setAdvanceNote] = useState('')
   const [showNotifs, setShowNotifs] = useState(false)
 
   async function load() {
@@ -47,6 +53,17 @@ export default function ProjectDetail() {
       setTeams(tm)
       setPeople(ppl)
       setNotifications(n)
+
+      const { data: stageReqs } = await supabase
+        .from('stage_advance_requests')
+        .select('*, requester:profiles!stage_advance_requests_requested_by_fkey(id, full_name)')
+        .eq('project_id', projectId)
+        .eq('status', 'pending')
+        .maybeSingle()
+      setPendingStageRequest(stageReqs || null)
+
+      const log = await fetchAuditLog({ entityType: 'project', entityId: projectId })
+      setAuditLog(log)
     } catch (err) {
       setLoadError(err.message || 'Could not load this project.')
     } finally {
@@ -68,12 +85,28 @@ export default function ProjectDetail() {
     }
   }
 
-  function handleStatusAdvance() {
+  function submitAdvanceRequest(e) {
+    e.preventDefault()
     const idx = STATUS_FLOW.indexOf(project.status)
     const next = STATUS_FLOW[idx + 1]
     if (!next) return
     runAction(async () => {
-      await updateProjectStatus(project.id, next)
+      await requestStageAdvance({
+        projectId: project.id, requestedBy: profile.id,
+        fromStatus: project.status, toStatus: next, note: advanceNote,
+      })
+      setShowAdvanceForm(false)
+      setAdvanceNote('')
+      await load()
+    })
+  }
+
+  function handleResolveAdvance(approve) {
+    runAction(async () => {
+      await resolveStageAdvance({
+        requestId: pendingStageRequest.id, approve, resolverId: profile.id,
+        projectId: project.id, toStatus: pendingStageRequest.to_status,
+      })
       await load()
     })
   }
@@ -135,7 +168,10 @@ export default function ProjectDetail() {
   }
 
   const h = healthColor(project.health)
-  const canEdit = profile.is_mbm || project.project_manager_id === profile.id || project.sponsor_id === profile.id
+  const isPM = project.project_manager_id === profile.id
+  const isSponsor = project.sponsor_id === profile.id
+  const canEdit = profile.is_mbm || isPM || isSponsor
+  const canApproveStage = profile.is_mbm || isSponsor
   const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(project.status) + 1]
 
   return (
@@ -195,17 +231,55 @@ export default function ProjectDetail() {
           ))}
         </div>
 
+        {pendingStageRequest && (
+          <div style={styles.pendingStageBox}>
+            <p style={styles.pendingStageTitle}>
+              Stage advance requested: {STATUS_LABELS[pendingStageRequest.from_status]} → {STATUS_LABELS[pendingStageRequest.to_status]}
+            </p>
+            <p style={styles.pendingStageDetail}>
+              Requested by {pendingStageRequest.requester?.full_name} · milestones {pendingStageRequest.milestone_completion_snapshot}% complete at time of request
+              {pendingStageRequest.note ? ` — "${pendingStageRequest.note}"` : ''}
+            </p>
+            {canApproveStage ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => handleResolveAdvance(true)} disabled={busy} style={styles.smallBtn}>Approve advance</button>
+                <button onClick={() => handleResolveAdvance(false)} disabled={busy} style={styles.smallBtnOutline}>Decline</button>
+              </div>
+            ) : (
+              <p style={styles.waitingText}>Waiting on sponsor or MBM approval.</p>
+            )}
+          </div>
+        )}
+
         {canEdit && (
           <div style={styles.actionRow}>
-            {nextStatus && (
-              <button onClick={handleStatusAdvance} disabled={busy} style={styles.smallBtn}>
-                Advance to {STATUS_LABELS[nextStatus]}
+            {nextStatus && !pendingStageRequest && (
+              <button onClick={() => setShowAdvanceForm(true)} disabled={busy} style={styles.smallBtn}>
+                Request advance to {STATUS_LABELS[nextStatus]}
               </button>
             )}
             <button onClick={() => { setShowHealthForm(true); setNewHealth(project.health) }} disabled={busy} style={styles.smallBtnOutline}>
               Update health status
             </button>
           </div>
+        )}
+
+        {showAdvanceForm && (
+          <form onSubmit={submitAdvanceRequest} style={styles.healthForm}>
+            <p style={styles.advanceFormNote}>
+              Milestones are currently {project.milestones?.length
+                ? Math.round((project.milestones.filter((m) => m.status === 'done').length / project.milestones.length) * 100)
+                : 0}% complete. This will be shown to the approver.
+            </p>
+            <textarea
+              value={advanceNote} onChange={(e) => setAdvanceNote(e.target.value)}
+              placeholder="Optional note for the approver" style={styles.textarea}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Sending…' : 'Send request'}</button>
+              <button type="button" onClick={() => setShowAdvanceForm(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
+            </div>
+          </form>
         )}
 
         {showHealthForm && (
@@ -300,6 +374,21 @@ export default function ProjectDetail() {
           </div>
         ))
       )}
+
+      <details style={{ marginTop: 24 }}>
+        <summary style={styles.logSummary}>Audit trail</summary>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+          {auditLog.length === 0 && <p style={styles.emptySub}>No activity logged yet.</p>}
+          {auditLog.map((entry) => (
+            <p key={entry.id} style={styles.logLine}>
+              <span style={styles.logTime}>
+                {new Date(entry.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </span>
+              {' — '}{entry.actor?.full_name} {entry.detail}
+            </p>
+          ))}
+        </div>
+      </details>
     </Shell>
   )
 }
@@ -327,6 +416,14 @@ const styles = {
   stageDot: { width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 },
   stageLabel: { fontSize: 10.5, color: 'var(--text-3)', margin: 0, textAlign: 'center' },
   actionRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  pendingStageBox: { background: 'var(--warning-light)', borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 16 },
+  pendingStageTitle: { fontSize: 13, fontWeight: 700, color: 'var(--warning)', margin: '0 0 4px' },
+  pendingStageDetail: { fontSize: 12.5, color: 'var(--warning)', margin: '0 0 10px', lineHeight: 1.5 },
+  waitingText: { fontSize: 12, color: 'var(--warning)', margin: 0, fontStyle: 'italic' },
+  advanceFormNote: { fontSize: 12.5, color: 'var(--text-2)', margin: 0 },
+  logSummary: { fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.03em', cursor: 'pointer' },
+  logLine: { fontSize: 12, color: 'var(--text-2)', margin: 0 },
+  logTime: { color: 'var(--text-3)' },
   healthForm: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14, padding: 14, background: 'var(--surface-2)', borderRadius: 'var(--radius)' },
   healthOption: { flex: 1, fontSize: 12.5, fontWeight: 700, padding: '8px 0', borderRadius: 'var(--radius)', border: '2px solid transparent' },
   textarea: { fontSize: 13, padding: '9px 11px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: '#fff', minHeight: 56, fontFamily: 'inherit', resize: 'vertical' },

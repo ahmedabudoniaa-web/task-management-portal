@@ -6,6 +6,7 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
   const { profile, signOut } = useAuth()
   const location = useLocation()
   const onProjects = location.pathname.startsWith('/projects')
+  const onActions = location.pathname.startsWith('/actions')
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -33,11 +34,14 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
                 <p style={styles.greeting}>Hey {profile?.full_name?.split(' ')[0]}, here's today</p>
               </div>
               <div style={styles.navGroup}>
-                <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onProjects ? styles.navLinkActive : {}) }}>
+                <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onProjects && !onActions ? styles.navLinkActive : {}) }}>
                   Tasks
                 </Link>
                 <Link to="/projects" className="nav-link" style={{ ...styles.navLink, ...(onProjects ? styles.navLinkActive : {}) }}>
                   Projects
+                </Link>
+                <Link to="/actions" className="nav-link" style={{ ...styles.navLink, ...(onActions ? styles.navLinkActive : {}) }}>
+                  Actions
                 </Link>
               </div>
             </div>

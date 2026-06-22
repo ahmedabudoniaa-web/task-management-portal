@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { logAudit } from './governance'
 
 // ---------- PROJECTS ----------
 
@@ -69,6 +70,7 @@ export async function createProject({
     .select()
     .single()
   if (error) throw error
+  await logAudit({ entityType: 'project', entityId: data.id, actorId: createdBy, action: 'created', detail: `Project created: ${name}` })
   return data
 }
 
@@ -92,6 +94,11 @@ export async function updateProjectHealth({ projectId, newHealth, oldHealth, rea
 
   const { error } = await supabase.from('projects').update({ health: newHealth }).eq('id', projectId)
   if (error) throw error
+
+  await logAudit({
+    entityType: 'project', entityId: projectId, actorId: changedBy,
+    action: 'health_changed', detail: `Health changed to ${newHealth}: ${reason}`,
+  })
 }
 
 // ---------- MILESTONES ----------
@@ -110,6 +117,7 @@ export async function createMilestone({ projectId, name, ownerId, plannedDate, s
     .select()
     .single()
   if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId: createdBy, action: 'milestone_added', detail: `Added milestone: ${name}` })
   return data
 }
 
