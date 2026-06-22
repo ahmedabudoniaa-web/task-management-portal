@@ -394,7 +394,7 @@ export default function ProjectDetail() {
               <div style={styles.milestoneTasks}>
                 {m.tasks.map((t) => (
                   <span key={t.id} style={styles.milestoneTaskChip}>
-                    {t.status === 'done' && <i className="ti ti-check" style={{ fontSize: 11, marginRight: 3 }} aria-hidden="true" />}
+                    {t.status === 'completed' && <i className="ti ti-check" style={{ fontSize: 11, marginRight: 3 }} aria-hidden="true" />}
                     {t.name}
                   </span>
                 ))}
@@ -402,6 +402,23 @@ export default function ProjectDetail() {
             )}
           </div>
         ))
+      )}
+
+      {project.direct_tasks && project.direct_tasks.length > 0 && (
+        <>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>Tasks</h2>
+          </div>
+          {project.direct_tasks.map((t) => (
+            <div key={t.id} style={styles.directTaskRow}>
+              <span style={styles.directTaskName}>
+                {t.status === 'completed' && <i className="ti ti-check" style={{ fontSize: 12, marginRight: 5, color: 'var(--success)' }} aria-hidden="true" />}
+                {t.name}
+              </span>
+              <span style={styles.directTaskMeta}>{t.assignee?.full_name || 'Unassigned'}</span>
+            </div>
+          ))}
+        </>
       )}
 
       <details style={{ marginTop: 24 }}>
@@ -476,6 +493,9 @@ const styles = {
   milestoneProgressFill: { height: '100%', background: 'var(--bupa-blue)' },
   milestoneTasks: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   milestoneTaskChip: { fontSize: 11.5, color: 'var(--text-2)', background: 'var(--surface-2)', padding: '3px 9px', borderRadius: 999 },
+  directTaskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 8, boxShadow: '0 1px 4px rgba(0,80,160,0.04)' },
+  directTaskName: { fontSize: 13.5, fontWeight: 600, color: 'var(--text)' },
+  directTaskMeta: { fontSize: 12, color: 'var(--text-3)' },
   smallBtn: { fontSize: 13, padding: '8px 14px', borderRadius: 'var(--radius)', border: 'none', background: 'var(--bupa-blue)', color: '#fff', fontWeight: 700 },
   smallBtnOutline: { fontSize: 13, padding: '8px 14px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'none', color: 'var(--text)', fontWeight: 600 },
   emptyState: { textAlign: 'center', padding: '50px 0', color: 'var(--text-3)' },

@@ -38,12 +38,20 @@ export async function fetchProjectDetail(projectId) {
       sponsor:profiles!projects_sponsor_id_fkey(id, full_name),
       project_manager:profiles!projects_project_manager_id_fkey(id, full_name),
       milestones(*, owner:profiles!milestones_owner_id_fkey(id, full_name), tasks(id, name, status, percent_complete, assignee:profiles!tasks_assignee_id_fkey(id, full_name))),
-      project_health_log(*, changer:profiles(id, full_name))
+      project_health_log(*, changer:profiles(id, full_name)),
+      tasks(id, name, status, priority, target_date, owner:profiles!tasks_owner_id_fkey(id, full_name), assignee:profiles!tasks_assignee_id_fkey(id, full_name))
     `)
     .eq('id', projectId)
     .order('sort_order', { referencedTable: 'milestones', ascending: true })
     .single()
   if (error) throw error
+  // tasks here are ALL tasks with this project_id, including ones also
+  // linked to a milestone (those appear in both places). Filter to just
+  // the unlinked-to-milestone ones for a clean "direct" list in the UI.
+  if (data) {
+    const milestoneTaskIds = new Set((data.milestones || []).flatMap((m) => (m.tasks || []).map((t) => t.id)))
+    data.direct_tasks = (data.tasks || []).filter((t) => !milestoneTaskIds.has(t.id))
+  }
   return data
 }
 

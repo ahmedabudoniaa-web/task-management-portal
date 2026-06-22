@@ -19,7 +19,7 @@ export default function RejectionBanner({ tasks, onDismiss }) {
         <div className="marquee-track" style={styles.track}>
           {[...tasks, ...tasks].map((t, i) => (
             <span key={i} style={styles.item}>
-              <strong>{t.name}</strong> was rejected by {t.assigneeName || 'the assignee'} — now unassigned
+              <strong>{t.name}</strong> was rejected by {t.assigneeName || 'the assignee'} — back to initiated
             </span>
           ))}
         </div>

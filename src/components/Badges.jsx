@@ -1,10 +1,9 @@
 const STATUS_STYLES = {
-  unassigned: { bg: 'rgba(255,255,255,0.7)', text: '#6B7488', label: 'Unassigned' },
+  initiated: { bg: 'rgba(255,255,255,0.7)', text: '#6B7488', label: 'Initiated' },
   pending_acceptance: { bg: 'var(--warning-light)', text: 'var(--warning)', label: 'Pending acceptance' },
   in_progress: { bg: 'var(--info-light)', text: 'var(--info)', label: 'In progress' },
   blocked: { bg: 'var(--danger-light)', text: 'var(--danger)', label: 'Blocked' },
-  done: { bg: 'var(--success-light)', text: 'var(--success)', label: 'Done' },
-  rejected: { bg: 'var(--danger-light)', text: 'var(--danger)', label: 'Rejected' },
+  completed: { bg: 'var(--success-light)', text: 'var(--success)', label: 'Completed' },
   delayed: { bg: 'var(--danger-light)', text: 'var(--danger)', label: 'Delayed' },
 }
 
@@ -29,7 +28,7 @@ function Badge({ bg, text, label }) {
 }
 
 export function StatusBadge({ status, isDelayed }) {
-  const s = isDelayed && status !== 'done' ? STATUS_STYLES.delayed : (STATUS_STYLES[status] || STATUS_STYLES.unassigned)
+  const s = isDelayed && status !== 'completed' ? STATUS_STYLES.delayed : (STATUS_STYLES[status] || STATUS_STYLES.initiated)
   return <Badge {...s} />
 }
 

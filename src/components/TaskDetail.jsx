@@ -4,7 +4,7 @@ import { useAuth } from '../lib/AuthContext'
 import {
   fetchTaskDetail, acceptTask, rejectTask, requestDateChange, resolveDateChange,
   createSubAction, updateSubActionStatus, addNote, editNote, markTaskDone,
-  assignTask, deleteTask,
+  assignTask, deleteTask, setTaskBlocked,
 } from '../lib/tasks'
 import { renderMentionSegments, fetchTaskDependencies, addDependency, removeDependency } from '../lib/dependencies'
 import MentionText from './MentionText'
@@ -129,7 +129,7 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
   const canApprove = isOwner || profile.is_mbm
   const canEditFreely = isOwner || isAssignee || profile.is_mbm
   const isUnassigned = !task.assignee_id
-  const isDelayed = task.status !== 'done' && task.target_date && new Date(task.target_date) < new Date()
+  const isDelayed = task.status !== 'completed' && task.target_date && new Date(task.target_date) < new Date()
 
   const pendingTaskRequest = task.date_change_requests?.find((r) => r.status === 'pending' && r.sub_action_id === null)
 
@@ -231,6 +231,13 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
     })
   }
 
+  function handleSetBlocked(blocked) {
+    runAction(async () => {
+      await setTaskBlocked(task.id, blocked)
+      await refresh()
+    })
+  }
+
   function submitDependency(e) {
     e.preventDefault()
     if (!newBlockerId) return
@@ -326,6 +333,13 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
           </div>
         </div>
 
+        {task.project && (
+          <p style={styles.projectLine}>
+            <i className="ti ti-briefcase" style={{ fontSize: 13, marginRight: 5 }} aria-hidden="true" />
+            Part of <strong style={{ fontWeight: 700 }}>{task.project.name}</strong>
+          </p>
+        )}
+
         {isOwner && isUnassigned && !showAssignForm && (
           <button onClick={() => setShowAssignForm(true)} style={styles.linkBtn}>
             <i className="ti ti-user-plus" style={{ fontSize: 14 }} aria-hidden="true" /> Assign this task
@@ -390,7 +404,7 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
           </div>
         )}
 
-        {canEditFreely && task.status !== 'done' && !pendingTaskRequest && (
+        {canEditFreely && task.status !== 'completed' && !pendingTaskRequest && (
           <button onClick={() => { setShowPushForm('task'); setPushDate(task.target_date || '') }} style={styles.linkBtn}>
             <i className="ti ti-calendar-due" style={{ fontSize: 14 }} aria-hidden="true" /> Request deadline push
           </button>
@@ -405,13 +419,24 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
           </form>
         )}
 
-        {canEditFreely && task.status !== 'done' && task.status !== 'unassigned' && task.status !== 'pending_acceptance' && (
+        {canEditFreely && (task.status === 'in_progress' || task.status === 'blocked') && (
           <div style={styles.statusButtonRow}>
             <p style={styles.sectionLabel}>Status</p>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ ...styles.statusPill, ...(task.status === 'in_progress' ? styles.statusPillActive : {}) }}>
+              <button
+                onClick={() => task.status === 'blocked' && handleSetBlocked(false)}
+                disabled={busy}
+                style={{ ...styles.statusPillBtn, ...(task.status === 'in_progress' ? styles.statusPillActive : {}) }}
+              >
                 <i className="ti ti-player-play" style={{ fontSize: 12 }} aria-hidden="true" /> In progress
-              </span>
+              </button>
+              <button
+                onClick={() => task.status === 'in_progress' && handleSetBlocked(true)}
+                disabled={busy}
+                style={{ ...styles.statusPillBtn, ...(task.status === 'blocked' ? styles.statusPillBlockedActive : {}) }}
+              >
+                <i className="ti ti-hand-stop" style={{ fontSize: 12 }} aria-hidden="true" /> Blocked
+              </button>
               {isDelayed && (
                 <span style={styles.statusPillDelayed}>
                   <i className="ti ti-alert-triangle" style={{ fontSize: 12 }} aria-hidden="true" /> Delayed — past target date
@@ -421,13 +446,13 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
           </div>
         )}
 
-        {canEditFreely && task.status !== 'done' && (
+        {canEditFreely && task.status !== 'completed' && (
           <button onClick={handleMarkDone} disabled={busy} style={styles.markDoneBtn}>
             <i className="ti ti-circle-check" style={{ fontSize: 16 }} aria-hidden="true" /> {busy ? 'Marking done…' : 'Mark task as done'}
           </button>
         )}
 
-        {task.status === 'done' && (
+        {task.status === 'completed' && (
           <div style={styles.doneBanner}>
             <i className="ti ti-circle-check-filled" style={{ fontSize: 16, color: 'var(--success)' }} aria-hidden="true" />
             <span style={styles.doneBannerText}>Completed</span>
@@ -637,6 +662,7 @@ const styles = {
   actionErrorDismiss: { background: 'none', border: 'none', color: 'var(--danger)', flexShrink: 0, padding: 2 },
   description: { fontSize: 14, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 20 },
   peopleRow: { display: 'flex', gap: 28, paddingBottom: 18, marginBottom: 18, borderBottom: '1px solid var(--border)' },
+  projectLine: { fontSize: 12.5, color: 'var(--text-2)', margin: '-10px 0 18px' },
   personLabel: { fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.03em', margin: '0 0 3px' },
   personName: { fontSize: 13, fontWeight: 600, margin: 0 },
   acceptBox: { background: 'var(--warning-light)', borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 18 },
@@ -652,12 +678,13 @@ const styles = {
   pushFormInline: { display: 'flex', gap: 8, marginTop: 8, width: '100%' },
   input: { fontSize: 13, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' },
   statusButtonRow: { marginBottom: 14 },
-  statusPill: {
-    fontSize: 12.5, fontWeight: 600, padding: '6px 13px', borderRadius: 999,
+  statusPillBtn: {
+    fontSize: 12.5, fontWeight: 600, padding: '6px 13px', borderRadius: 999, border: 'none',
     display: 'inline-flex', alignItems: 'center', gap: 6,
     background: 'var(--surface-2)', color: 'var(--text-2)',
   },
   statusPillActive: { background: 'var(--info-light)', color: 'var(--info)' },
+  statusPillBlockedActive: { background: 'var(--danger-light)', color: 'var(--danger)' },
   statusPillDelayed: {
     fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999,
     display: 'inline-flex', alignItems: 'center', gap: 6,

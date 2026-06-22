@@ -1,22 +1,42 @@
 import { supabase } from './supabase'
 import { recordMentions } from './dependencies'
 
+// Wraps a Supabase call so a raw network failure ("Failed to fetch", which
+// the browser throws with no further detail when a request can't reach the
+// server at all — expired session, dropped connection, CORS, etc.) becomes
+// an actionable message instead of a dead end.
+async function withNetworkErrorHandling(fn) {
+  try {
+    return await fn()
+  } catch (err) {
+    if (err instanceof TypeError && /fetch/i.test(err.message)) {
+      throw new Error('Could not reach the server. Check your connection and try again — if this keeps happening, try signing out and back in.')
+    }
+    throw err
+  }
+}
+
 // ---------- TASKS ----------
 
-export async function fetchTasks({ profile, teamFilter }) {
+export async function fetchTasks({ profile, teamFilter, assigneeFilter, scope }) {
   let query = supabase
     .from('tasks')
     .select(`
       *,
       team:teams(id, name),
+      project:projects(id, name),
       owner:profiles!tasks_owner_id_fkey(id, full_name),
       assignee:profiles!tasks_assignee_id_fkey(id, full_name),
       sub_actions(*)
     `)
     .order('created_at', { ascending: false })
 
-  // Non-MBM users see their team's tasks plus anything they own/are assigned (cross-team)
-  if (!profile.is_mbm) {
+  // scope = 'mine' restricts to tasks where the current user is owner or
+  // assignee, regardless of MBM status — this powers the "My tasks" view.
+  // scope = 'team' (default) keeps the existing team-or-participant shape.
+  if (scope === 'mine') {
+    query = query.or(`owner_id.eq.${profile.id},assignee_id.eq.${profile.id}`)
+  } else if (!profile.is_mbm) {
     query = query.or(
       `team_id.eq.${profile.team_id},owner_id.eq.${profile.id},assignee_id.eq.${profile.id}`
     )
@@ -24,10 +44,15 @@ export async function fetchTasks({ profile, teamFilter }) {
   if (teamFilter) {
     query = query.eq('team_id', teamFilter)
   }
+  if (assigneeFilter) {
+    query = query.eq('assignee_id', assigneeFilter)
+  }
 
-  const { data, error } = await query
-  if (error) throw error
-  return data
+  return withNetworkErrorHandling(async () => {
+    const { data, error } = await query
+    if (error) throw error
+    return data
+  })
 }
 
 export async function fetchTaskDetail(taskId) {
@@ -36,6 +61,7 @@ export async function fetchTaskDetail(taskId) {
     .select(`
       *,
       team:teams(id, name),
+      project:projects(id, name),
       owner:profiles!tasks_owner_id_fkey(id, full_name),
       assignee:profiles!tasks_assignee_id_fkey(id, full_name),
       sub_actions(*, assignee:profiles!sub_actions_assignee_id_fkey(id, full_name)),
@@ -49,77 +75,101 @@ export async function fetchTaskDetail(taskId) {
   return data
 }
 
-export async function createTask({ name, description, teamId, ownerId, assigneeId, targetDate, priority }) {
-  const status = assigneeId
-    ? (assigneeId === ownerId ? 'in_progress' : 'pending_acceptance')
-    : 'unassigned'
+export async function createTask({ name, description, teamId, projectId, ownerId, assigneeId, targetDate, priority, subActions }) {
+  return withNetworkErrorHandling(async () => {
+    const status = assigneeId
+      ? (assigneeId === ownerId ? 'in_progress' : 'pending_acceptance')
+      : 'initiated'
 
-  const { data, error } = await supabase
-    .from('tasks')
-    .insert({
-      name,
-      description,
-      team_id: teamId,
-      owner_id: ownerId,
-      assignee_id: assigneeId || null,
-      target_date: targetDate || null,
-      priority: priority || 'medium',
-      status,
-    })
-    .select()
-    .single()
-  if (error) throw error
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        name,
+        description,
+        team_id: teamId,
+        project_id: projectId || null,
+        owner_id: ownerId,
+        assignee_id: assigneeId || null,
+        target_date: targetDate || null,
+        priority: priority || 'medium',
+        status,
+      })
+      .select()
+      .single()
+    if (error) throw error
 
-  await logChange(data.id, ownerId, 'created', `Task created${assigneeId ? ' and assigned' : ''}`)
-  if (assigneeId && assigneeId !== ownerId) {
-    await notify(assigneeId, data.id, 'assigned', `You've been assigned: "${name}"`)
-  }
-  return data
+    await logChange(data.id, ownerId, 'created', `Task created${assigneeId ? ' and assigned' : ''}`)
+    if (assigneeId && assigneeId !== ownerId) {
+      await notify(assigneeId, data.id, 'assigned', `You've been assigned: "${name}"`)
+    }
+
+    // Optional sub-actions created at the same time as the task, so the
+    // creation form can capture everything in one step.
+    if (subActions && subActions.length > 0) {
+      for (const sa of subActions) {
+        if (!sa.name?.trim()) continue
+        await supabase.from('sub_actions').insert({
+          task_id: data.id, name: sa.name, description: sa.description || null,
+          deadline: sa.deadline || null, assignee_id: sa.assigneeId || null, created_by: ownerId,
+        })
+      }
+    }
+
+    return data
+  })
 }
 
 // ---------- ACCEPT / REJECT ----------
 
 export async function acceptTask(taskId, userId) {
-  const { error } = await supabase
-    .from('tasks')
-    .update({ status: 'in_progress' })
-    .eq('id', taskId)
-  if (error) throw error
-  await logChange(taskId, userId, 'accepted', 'Assignee accepted the task')
+  return withNetworkErrorHandling(async () => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: 'in_progress' })
+      .eq('id', taskId)
+    if (error) throw error
+    await logChange(taskId, userId, 'accepted', 'Assignee accepted the task')
+  })
 }
 
 export async function rejectTask(taskId, userId, ownerId, taskName) {
-  const { error } = await supabase
-    .from('tasks')
-    .update({ status: 'unassigned', assignee_id: null })
-    .eq('id', taskId)
-  if (error) throw error
-  await logChange(taskId, userId, 'rejected', 'Assignee rejected the task')
-  await notify(ownerId, taskId, 'rejected', `Task rejected: "${taskName}" is now unassigned`)
+  return withNetworkErrorHandling(async () => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: 'initiated', assignee_id: null })
+      .eq('id', taskId)
+    if (error) throw error
+    await logChange(taskId, userId, 'rejected', 'Assignee rejected the task')
+    await notify(ownerId, taskId, 'rejected', `Task rejected: "${taskName}" is back to initiated`)
+  })
 }
 
-// Assigns (or reassigns) an unassigned task. Mirrors createTask's status
-// logic: self-assignment skips the accept/reject step entirely, assigning
+// Assigns (or reassigns) a task. Mirrors createTask's status logic:
+// self-assignment skips the accept/reject step entirely, assigning
 // someone else puts it in pending_acceptance.
 export async function assignTask({ taskId, ownerId, assigneeId, taskName }) {
-  const status = assigneeId === ownerId ? 'in_progress' : 'pending_acceptance'
-  const { error } = await supabase
-    .from('tasks')
-    .update({ assignee_id: assigneeId, status })
-    .eq('id', taskId)
-  if (error) throw error
-  await logChange(taskId, ownerId, 'assigned', `Task assigned`)
-  if (assigneeId !== ownerId) {
-    await notify(assigneeId, taskId, 'assigned', `You've been assigned: "${taskName}"`)
-  }
+  return withNetworkErrorHandling(async () => {
+    const status = assigneeId === ownerId ? 'in_progress' : 'pending_acceptance'
+    const { error } = await supabase
+      .from('tasks')
+      .update({ assignee_id: assigneeId, status })
+      .eq('id', taskId)
+    if (error) throw error
+    await logChange(taskId, ownerId, 'assigned', `Task assigned`)
+    if (assigneeId !== ownerId) {
+      await notify(assigneeId, taskId, 'assigned', `You've been assigned: "${taskName}"`)
+    }
+  })
 }
 
 // Owner-only hard delete. Cascades to sub_actions, notes, change_log,
 // date_change_requests, and task_dependencies via their on-delete-cascade
 // foreign keys — nothing orphaned.
 export async function deleteTask(taskId) {
-  const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-  if (error) throw error
+  return withNetworkErrorHandling(async () => {
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+    if (error) throw error
+  })
 }
 
 // ---------- DEADLINE PUSH (approval-gated) ----------
@@ -240,8 +290,17 @@ export async function updatePercentComplete(taskId, percent) {
 // the resulting Postgres error message — which already explains why —
 // surfaces to the UI via the normal error-handling path.
 export async function markTaskDone(taskId) {
-  const { error } = await supabase.from('tasks').update({ status: 'done', percent_complete: 100 }).eq('id', taskId)
-  if (error) throw error
+  return withNetworkErrorHandling(async () => {
+    const { error } = await supabase.from('tasks').update({ status: 'completed', percent_complete: 100 }).eq('id', taskId)
+    if (error) throw error
+  })
+}
+
+export async function setTaskBlocked(taskId, blocked) {
+  return withNetworkErrorHandling(async () => {
+    const { error } = await supabase.from('tasks').update({ status: blocked ? 'blocked' : 'in_progress' }).eq('id', taskId)
+    if (error) throw error
+  })
 }
 
 // ---------- NOTIFICATIONS ----------
