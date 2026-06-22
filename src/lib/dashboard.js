@@ -28,8 +28,12 @@ export function computeExecutiveMetrics({ projects, actions }) {
   upcomingMilestones.sort((a, b) => new Date(a.planned_date) - new Date(b.planned_date))
 
   return {
-    active, completed, delayed, atRisk,
-    openActions, overdueActions,
+    active,
+    completed,
+    delayed,
+    atRisk,
+    openActions,
+    overdueActions,
     upcomingMilestones: upcomingMilestones.slice(0, 5),
   }
 }
@@ -56,7 +60,11 @@ export function searchAll({ query, projects, tasks, actions, risks, decisions })
   const matchedDecisions = decisions.filter((d) => d.decision?.toLowerCase().includes(q))
 
   return {
-    projects: matchedProjects, milestones, tasks: matchedTasks,
-    actions: matchedActions, risks: matchedRisks, decisions: matchedDecisions,
+    projects: matchedProjects,
+    milestones,
+    tasks: matchedTasks,
+    actions: matchedActions,
+    risks: matchedRisks,
+    decisions: matchedDecisions,
   }
 }
