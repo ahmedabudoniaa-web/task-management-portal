@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import Actions from './pages/Actions'
+import Governance from './pages/Governance'
 
 function AppInner() {
   const { session, profile, loading } = useAuth()
@@ -26,6 +27,7 @@ function AppInner() {
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/:projectId" element={<ProjectDetail />} />
         <Route path="/actions" element={<Actions />} />
+        <Route path="/governance" element={<Governance />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -7,6 +7,7 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
   const location = useLocation()
   const onProjects = location.pathname.startsWith('/projects')
   const onActions = location.pathname.startsWith('/actions')
+  const onGovernance = location.pathname.startsWith('/governance')
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -34,7 +35,7 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
                 <p style={styles.greeting}>Hey {profile?.full_name?.split(' ')[0]}, here's today</p>
               </div>
               <div style={styles.navGroup}>
-                <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onProjects && !onActions ? styles.navLinkActive : {}) }}>
+                <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onProjects && !onActions && !onGovernance ? styles.navLinkActive : {}) }}>
                   Tasks
                 </Link>
                 <Link to="/projects" className="nav-link" style={{ ...styles.navLink, ...(onProjects ? styles.navLinkActive : {}) }}>
@@ -42,6 +43,9 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
                 </Link>
                 <Link to="/actions" className="nav-link" style={{ ...styles.navLink, ...(onActions ? styles.navLinkActive : {}) }}>
                   Actions
+                </Link>
+                <Link to="/governance" className="nav-link" style={{ ...styles.navLink, ...(onGovernance ? styles.navLinkActive : {}) }}>
+                  Governance
                 </Link>
               </div>
             </div>
