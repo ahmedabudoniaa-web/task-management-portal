@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom'
 export default function Shell({ children, teams, teamFilter, setTeamFilter, notifCount, onBellClick, progressPercent, searchSlot }) {
   const { profile, signOut } = useAuth()
   const location = useLocation()
+  const onPortfolio = location.pathname.startsWith('/portfolio')
   const onProjects = location.pathname.startsWith('/projects')
   const onActions = location.pathname.startsWith('/actions')
   const onGovernance = location.pathname.startsWith('/governance')
@@ -37,8 +38,11 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
                 <p style={styles.greeting}>Hey {profile?.full_name?.split(' ')[0]}, here's today</p>
               </div>
               <div style={styles.navGroup}>
-                <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onProjects && !onActions && !onGovernance ? styles.navLinkActive : {}) }}>
+                <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onPortfolio && !onProjects && !onActions && !onGovernance ? styles.navLinkActive : {}) }}>
                   Tasks
+                </Link>
+                <Link to="/portfolio" className="nav-link" style={{ ...styles.navLink, ...(onPortfolio ? styles.navLinkActive : {}) }}>
+                  Portfolio
                 </Link>
                 <Link to="/projects" className="nav-link" style={{ ...styles.navLink, ...(onProjects ? styles.navLinkActive : {}) }}>
                   Projects

@@ -6,6 +6,7 @@ import Projects from './pages/Projects'
 import ProjectDetail from './pages/ProjectDetail'
 import Actions from './pages/Actions'
 import Governance from './pages/Governance'
+import PortfolioDashboard from './pages/PortfolioDashboard'
 
 function AppInner() {
   const { session, profile, loading } = useAuth()
@@ -24,6 +25,7 @@ function AppInner() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/portfolio" element={<PortfolioDashboard />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/:projectId" element={<ProjectDetail />} />
         <Route path="/actions" element={<Actions />} />
