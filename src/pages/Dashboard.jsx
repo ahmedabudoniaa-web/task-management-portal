@@ -11,10 +11,11 @@ import NotificationsPanel from '../components/NotificationsPanel'
 
 const MY_STATUS_FILTERS = [
   { key: 'all', label: 'All' },
-  { key: 'initiated', label: 'Initiated' },
+  { key: 'initiated', label: 'To Do' },
   { key: 'pending_acceptance', label: 'Pending acceptance' },
   { key: 'in_progress', label: 'In progress' },
   { key: 'blocked', label: 'Blocked' },
+  { key: 'cancelled', label: 'Cancelled' },
   { key: 'completed', label: 'Completed' },
 ]
 
@@ -22,11 +23,11 @@ const TEAM_STATUS_FILTERS = MY_STATUS_FILTERS
 
 
 function isTaskOverdue(task) {
-  return task.status !== 'completed' && task.target_date && new Date(task.target_date) < new Date()
+  return !['completed', 'done', 'cancelled', 'canceled'].includes(task.status) && task.target_date && new Date(task.target_date) < new Date()
 }
 
 function isDueThisWeek(task) {
-  if (!task.target_date || task.status === 'completed') return false
+  if (!task.target_date || ['completed', 'done', 'cancelled', 'canceled'].includes(task.status)) return false
   const now = new Date()
   const due = new Date(task.target_date)
   const weekAhead = new Date(now)
@@ -65,12 +66,12 @@ function buildTaskSections(tasks) {
     { key: 'urgent', title: 'Urgent & high priority', icon: '⚡', tone: 'warning', tasks: [] },
     { key: 'this_week', title: 'Due this week', icon: '📅', tone: 'info', tasks: [] },
     { key: 'in_progress', title: 'In progress', icon: '🚀', tone: 'info', tasks: [] },
-    { key: 'other', title: 'Other open tasks', icon: '📌', tone: 'neutral', tasks: [] },
-    { key: 'completed', title: 'Completed', icon: '✅', tone: 'success', tasks: [] },
+    { key: 'other', title: 'To Do', icon: '📌', tone: 'neutral', tasks: [] },
+    { key: 'completed', title: 'Completed / cancelled', icon: '✅', tone: 'success', tasks: [] },
   ]
 
   for (const task of sorted) {
-    if (task.status === 'completed') sections[5].tasks.push(task)
+    if (['completed', 'done', 'cancelled', 'canceled'].includes(task.status)) sections[5].tasks.push(task)
     else if (isTaskOverdue(task)) sections[0].tasks.push(task)
     else if (task.priority === 'urgent' || task.priority === 'high') sections[1].tasks.push(task)
     else if (isDueThisWeek(task)) sections[2].tasks.push(task)
@@ -136,11 +137,12 @@ export default function Dashboard() {
   const taskSections = useMemo(() => buildTaskSections(filteredTasks), [filteredTasks])
 
   const taskSummary = useMemo(() => {
-    const open = filteredTasks.filter((t) => t.status !== 'completed').length
+    const open = filteredTasks.filter((t) => !['completed', 'done', 'cancelled', 'canceled'].includes(t.status)).length
     const overdue = filteredTasks.filter(isTaskOverdue).length
     const dueThisWeek = filteredTasks.filter(isDueThisWeek).length
-    const completed = filteredTasks.filter((t) => t.status === 'completed').length
-    return { open, overdue, dueThisWeek, completed }
+    const completed = filteredTasks.filter((t) => ['completed', 'done'].includes(t.status)).length
+    const cancelled = filteredTasks.filter((t) => ['cancelled', 'canceled'].includes(t.status)).length
+    return { open, overdue, dueThisWeek, completed, cancelled }
   }, [filteredTasks])
 
   const rejectedForMe = useMemo(
@@ -155,7 +157,7 @@ export default function Dashboard() {
 
   const progressPercent = useMemo(() => {
     if (myTasks.length === 0) return 0
-    const done = myTasks.filter((t) => t.status === 'completed').length
+    const done = myTasks.filter((t) => ['completed', 'done'].includes(t.status)).length
     return (done / myTasks.length) * 100
   }, [myTasks])
 
@@ -213,6 +215,7 @@ export default function Dashboard() {
         <SummaryCard label="Overdue" value={taskSummary.overdue} icon="🔥" tone="danger" />
         <SummaryCard label="Due this week" value={taskSummary.dueThisWeek} icon="📅" tone="info" />
         <SummaryCard label="Completed" value={taskSummary.completed} icon="✅" tone="success" />
+        <SummaryCard label="Cancelled" value={taskSummary.cancelled} icon="⊘" />
       </div>
 
       {loadError ? (

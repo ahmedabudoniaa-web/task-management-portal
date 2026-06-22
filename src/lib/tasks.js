@@ -27,13 +27,14 @@ export async function fetchTasks({ profile, teamFilter, assigneeFilter, scope })
       project:projects(id, name),
       owner:profiles!tasks_owner_id_fkey(id, full_name),
       assignee:profiles!tasks_assignee_id_fkey(id, full_name),
-      sub_actions(*)
+      sub_actions(*, assignee:profiles!sub_actions_assignee_id_fkey(id, full_name))
     `)
+    .order('target_date', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false })
 
-  // scope = 'mine' restricts to tasks where the current user is owner or
-  // assignee, regardless of MBM status — this powers the "My tasks" view.
-  // scope = 'team' (default) keeps the existing team-or-participant shape.
+  // scope = 'mine' includes tasks owned/assigned to me. It is also merged
+  // with parent tasks where one of the visible sub-actions is assigned to me,
+  // so delegated sub-tasks appear in the assignee's dashboard too.
   if (scope === 'mine') {
     query = query.or(`owner_id.eq.${profile.id},assignee_id.eq.${profile.id}`)
   } else if (!profile.is_mbm) {
@@ -41,17 +42,55 @@ export async function fetchTasks({ profile, teamFilter, assigneeFilter, scope })
       `team_id.eq.${profile.team_id},owner_id.eq.${profile.id},assignee_id.eq.${profile.id}`
     )
   }
-  if (teamFilter) {
-    query = query.eq('team_id', teamFilter)
-  }
-  if (assigneeFilter) {
-    query = query.eq('assignee_id', assigneeFilter)
-  }
+  if (teamFilter) query = query.eq('team_id', teamFilter)
+  if (assigneeFilter) query = query.eq('assignee_id', assigneeFilter)
 
   return withNetworkErrorHandling(async () => {
     const { data, error } = await query
     if (error) throw error
-    return data
+
+    if (scope !== 'mine') return sortTaskRows(data || [])
+
+    const { data: subRows, error: subErr } = await supabase
+      .from('sub_actions')
+      .select(`
+        *,
+        task:tasks(
+          *,
+          team:teams(id, name),
+          project:projects(id, name),
+          owner:profiles!tasks_owner_id_fkey(id, full_name),
+          assignee:profiles!tasks_assignee_id_fkey(id, full_name),
+          sub_actions(*, assignee:profiles!sub_actions_assignee_id_fkey(id, full_name))
+        )
+      `)
+      .eq('assignee_id', profile.id)
+    if (subErr) throw subErr
+
+    const merged = new Map()
+    for (const task of data || []) merged.set(task.id, task)
+    for (const row of subRows || []) {
+      if (row.task) merged.set(row.task.id, { ...row.task, has_subtask_for_me: true })
+    }
+    return sortTaskRows([...merged.values()])
+  })
+}
+
+function sortTaskRows(tasks) {
+  const priorityRank = { urgent: 0, high: 1, medium: 2, low: 3 }
+  const isClosed = (t) => ['completed', 'done', 'cancelled', 'canceled'].includes(t.status)
+  const isOverdue = (t) => !isClosed(t) && t.target_date && new Date(t.target_date) < new Date()
+  return [...tasks].sort((a, b) => {
+    const overdueDiff = Number(isOverdue(b)) - Number(isOverdue(a))
+    if (overdueDiff) return overdueDiff
+    const closedDiff = Number(isClosed(a)) - Number(isClosed(b))
+    if (closedDiff) return closedDiff
+    const pDiff = (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9)
+    if (pDiff) return pDiff
+    const aDate = a.target_date ? new Date(a.target_date).getTime() : Number.MAX_SAFE_INTEGER
+    const bDate = b.target_date ? new Date(b.target_date).getTime() : Number.MAX_SAFE_INTEGER
+    if (aDate !== bDate) return aDate - bDate
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0)
   })
 }
 
@@ -77,9 +116,7 @@ export async function fetchTaskDetail(taskId) {
 
 export async function createTask({ name, description, teamId, projectId, ownerId, assigneeId, targetDate, priority, subActions }) {
   return withNetworkErrorHandling(async () => {
-    const status = assigneeId
-      ? (assigneeId === ownerId ? 'in_progress' : 'pending_acceptance')
-      : 'initiated'
+    const status = assigneeId && assigneeId !== ownerId ? 'pending_acceptance' : 'initiated'
 
     const { data, error } = await supabase
       .from('tasks')
@@ -140,7 +177,21 @@ export async function rejectTask(taskId, userId, ownerId, taskName) {
       .eq('id', taskId)
     if (error) throw error
     await logChange(taskId, userId, 'rejected', 'Assignee rejected the task')
-    await notify(ownerId, taskId, 'rejected', `Task rejected: "${taskName}" is back to initiated`)
+    await notify(ownerId, taskId, 'rejected', `Task rejected: "${taskName}" is back to To Do`)
+  })
+}
+
+export async function cancelTask(taskId, userId, ownerId, taskName) {
+  return withNetworkErrorHandling(async () => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: 'cancelled', percent_complete: 0 })
+      .eq('id', taskId)
+    if (error) throw error
+    await logChange(taskId, userId, 'cancelled', 'Task cancelled')
+    if (ownerId && ownerId !== userId) {
+      await notify(ownerId, taskId, 'cancelled', `Task cancelled: "${taskName}"`)
+    }
   })
 }
 
@@ -149,7 +200,7 @@ export async function rejectTask(taskId, userId, ownerId, taskName) {
 // someone else puts it in pending_acceptance.
 export async function assignTask({ taskId, ownerId, assigneeId, taskName }) {
   return withNetworkErrorHandling(async () => {
-    const status = assigneeId === ownerId ? 'in_progress' : 'pending_acceptance'
+    const status = assigneeId === ownerId ? 'initiated' : 'pending_acceptance'
     const { error } = await supabase
       .from('tasks')
       .update({ assignee_id: assigneeId, status })

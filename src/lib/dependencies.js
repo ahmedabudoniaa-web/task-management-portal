@@ -49,16 +49,45 @@ export async function recordMentions({ text, people, entityType, entityId, menti
   const mentioned = extractMentions(text, people)
   for (const person of mentioned) {
     if (person.id === mentioningUserId) continue // don't notify yourself
-    await supabase.from('mentions').insert({
-      entity_type: entityType,
-      entity_id: entityId,
-      mentioned_user_id: person.id,
-      mentioning_user_id: mentioningUserId,
-      context_task_id: contextTaskId || null,
-      context_action_id: contextActionId || null,
+
+    // Store the mention when the optional mentions table exists. If the
+    // project has not run that migration yet, mentions still work through
+    // notifications below instead of breaking note posting. Technology, the
+    // art of gracefully failing in twelve different places.
+    try {
+      await supabase.from('mentions').insert({
+        entity_type: entityType,
+        entity_id: entityId,
+        mentioned_user_id: person.id,
+        mentioning_user_id: mentioningUserId,
+        context_task_id: contextTaskId || null,
+        context_action_id: contextActionId || null,
+      })
+    } catch {
+      // Non-critical. Notifications are the user-facing part.
+    }
+
+    await supabase.from('notifications').insert({
+      user_id: person.id,
+      task_id: contextTaskId || null,
+      type: 'mention',
+      message: `You were mentioned in a ${entityType.replace('_', ' ')}.`,
     })
   }
   return mentioned
+}
+
+export function getMentionSuggestions(text, people) {
+  const match = text.match(/@([^@\s]*)$/)
+  if (!match) return []
+  const q = match[1].toLowerCase()
+  return people
+    .filter((p) => p.full_name?.toLowerCase().includes(q))
+    .slice(0, 6)
+}
+
+export function insertMention(text, person) {
+  return text.replace(/@([^@\s]*)$/, `@${person.full_name} `)
 }
 
 // Renders @Full Name occurrences as visually distinct spans. Returns an

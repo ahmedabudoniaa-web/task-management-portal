@@ -4,9 +4,9 @@ import { useAuth } from '../lib/AuthContext'
 import {
   fetchTaskDetail, acceptTask, rejectTask, requestDateChange, resolveDateChange,
   createSubAction, updateSubActionStatus, addNote, editNote, markTaskDone,
-  assignTask, deleteTask, setTaskBlocked,
+  assignTask, deleteTask, setTaskBlocked, cancelTask,
 } from '../lib/tasks'
-import { renderMentionSegments, fetchTaskDependencies, addDependency, removeDependency } from '../lib/dependencies'
+import { fetchTaskDependencies, addDependency, removeDependency, getMentionSuggestions, insertMention } from '../lib/dependencies'
 import MentionText from './MentionText'
 
 export default function TaskDetail({ taskId, people, allTasks, onClose, onChanged }) {
@@ -34,6 +34,7 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
   const [newAssigneeId, setNewAssigneeId] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [subDescription, setSubDescription] = useState('')
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
 
   async function loadDependencies() {
     try {
@@ -231,9 +232,24 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
     })
   }
 
+  function handleStartProgress() {
+    runAction(async () => {
+      await setTaskBlocked(task.id, false)
+      await refresh()
+    })
+  }
+
   function handleSetBlocked(blocked) {
     runAction(async () => {
       await setTaskBlocked(task.id, blocked)
+      await refresh()
+    })
+  }
+
+  function handleCancelConfirmed() {
+    setConfirmingCancel(false)
+    runAction(async () => {
+      await cancelTask(task.id, profile.id, task.owner_id, task.name)
       await refresh()
     })
   }
@@ -424,29 +440,38 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
           </form>
         )}
 
-        {canEditFreely && (task.status === 'in_progress' || task.status === 'blocked') && (
+        {canEditFreely && task.status !== 'completed' && task.status !== 'cancelled' && task.status !== 'pending_acceptance' && (
           <div style={styles.statusButtonRow}>
             <p style={styles.sectionLabel}>Status</p>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button
-                onClick={() => task.status === 'blocked' && handleSetBlocked(false)}
-                disabled={busy}
+                onClick={handleStartProgress}
+                disabled={busy || task.status === 'in_progress'}
                 style={{ ...styles.statusPillBtn, ...(task.status === 'in_progress' ? styles.statusPillActive : {}) }}
               >
-                <i className="ti ti-player-play" style={{ fontSize: 12 }} aria-hidden="true" /> In progress
+                In progress
               </button>
               <button
-                onClick={() => task.status === 'in_progress' && handleSetBlocked(true)}
+                onClick={() => setConfirmingCancel(true)}
                 disabled={busy}
-                style={{ ...styles.statusPillBtn, ...(task.status === 'blocked' ? styles.statusPillBlockedActive : {}) }}
+                style={styles.statusPillCancel}
               >
-                <i className="ti ti-hand-stop" style={{ fontSize: 12 }} aria-hidden="true" /> Blocked
+                Cancel task
               </button>
+              {task.status === 'blocked' && <span style={styles.statusPillBlockedActive}>Blocked</span>}
               {isDelayed && (
-                <span style={styles.statusPillDelayed}>
-                  <i className="ti ti-alert-triangle" style={{ fontSize: 12 }} aria-hidden="true" /> Delayed — past target date
-                </span>
+                <span style={styles.statusPillDelayed}>Delayed — past target date</span>
               )}
+            </div>
+          </div>
+        )}
+
+        {confirmingCancel && (
+          <div style={styles.deleteConfirmBox}>
+            <p style={styles.deleteConfirmText}>Cancel this task? It will stay in the history but will no longer be treated as active work.</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleCancelConfirmed} disabled={busy} style={styles.deleteConfirmBtn}>{busy ? 'Cancelling…' : 'Yes, cancel it'}</button>
+              <button onClick={() => setConfirmingCancel(false)} disabled={busy} style={styles.smallBtnOutline}>Keep task</button>
             </div>
           </div>
         )}
@@ -611,11 +636,30 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
             ))}
         </div>
         {canEditFreely && (
-          <form onSubmit={submitNote} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
+          <form onSubmit={submitNote} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24, position: 'relative' }}>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="Add a note… (type @Full Name to mention)" style={{ ...styles.input, flex: 1 }} />
+              <input
+                value={noteBody}
+                onChange={(e) => setNoteBody(e.target.value)}
+                placeholder="Add a note… type @ then a name"
+                style={{ ...styles.input, flex: 1 }}
+              />
               <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Posting…' : 'Post'}</button>
             </div>
+            {getMentionSuggestions(noteBody, people).length > 0 && (
+              <div style={styles.mentionMenu}>
+                {getMentionSuggestions(noteBody, people).map((person) => (
+                  <button
+                    key={person.id}
+                    type="button"
+                    onClick={() => setNoteBody(insertMention(noteBody, person))}
+                    style={styles.mentionOption}
+                  >
+                    @{person.full_name}
+                  </button>
+                ))}
+              </div>
+            )}
           </form>
         )}
 
@@ -700,7 +744,8 @@ const styles = {
     background: 'var(--surface-2)', color: 'var(--text-2)',
   },
   statusPillActive: { background: 'var(--info-light)', color: 'var(--info)' },
-  statusPillBlockedActive: { background: 'var(--danger-light)', color: 'var(--danger)' },
+  statusPillBlockedActive: { background: 'var(--danger-light)', color: 'var(--danger)', fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999 },
+  statusPillCancel: { fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999, border: '1px solid var(--danger)', background: 'var(--danger-light)', color: 'var(--danger)' },
   statusPillDelayed: {
     fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999,
     display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -742,6 +787,8 @@ const styles = {
   noteMeta: { fontSize: 11, color: 'var(--text-3)', margin: '0 0 3px' },
   noteBody: { fontSize: 13, margin: 0, lineHeight: 1.5 },
   editNoteLink: { fontSize: 11, color: 'var(--info)', background: 'none', border: 'none', marginLeft: 8 },
+  mentionMenu: { position: 'absolute', left: 0, right: 88, bottom: 43, background: '#fff', border: '1px solid var(--border)', borderRadius: 'var(--radius)', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', padding: 6, zIndex: 5 },
+  mentionOption: { display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '8px 10px', borderRadius: 8, color: 'var(--text)', fontSize: 13, fontWeight: 600 },
   logSummary: { fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.03em', cursor: 'pointer' },
   logLine: { fontSize: 12, color: 'var(--text-2)', margin: 0 },
   logTime: { color: 'var(--text-3)' },
