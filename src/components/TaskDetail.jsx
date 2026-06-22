@@ -286,8 +286,13 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
           </div>
           <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
             {isOwner && !confirmingDelete && (
-              <button onClick={() => setConfirmingDelete(true)} style={styles.deleteIconBtn} aria-label="Delete task">
-                <i className="ti ti-trash" style={{ fontSize: 17 }} aria-hidden="true" />
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                style={styles.deleteTextBtn}
+                aria-label="Delete task"
+                title="Delete task"
+              >
+                Delete
               </button>
             )}
             <button onClick={onClose} style={styles.closeBtn} aria-label="Close task detail">
@@ -650,6 +655,17 @@ const styles = {
   title: { fontSize: 19, fontWeight: 700, margin: 0, wordBreak: 'break-word' },
   closeBtn: { background: 'none', border: 'none', color: 'var(--text-2)', flexShrink: 0, padding: 4 },
   deleteIconBtn: { background: 'none', border: 'none', color: 'var(--text-3)', flexShrink: 0, padding: 4 },
+  deleteTextBtn: {
+    background: 'var(--danger)',
+    border: 'none',
+    color: '#fff',
+    flexShrink: 0,
+    padding: '7px 12px',
+    borderRadius: 'var(--radius)',
+    fontSize: 12.5,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
   deleteConfirmBox: { background: 'var(--danger-light)', borderRadius: 'var(--radius)', padding: '12px 14px', marginBottom: 16 },
   deleteConfirmText: { fontSize: 13, color: 'var(--danger)', margin: '0 0 10px', lineHeight: 1.5 },
   deleteConfirmBtn: { padding: '8px 16px', borderRadius: 'var(--radius)', border: 'none', background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 700 },
