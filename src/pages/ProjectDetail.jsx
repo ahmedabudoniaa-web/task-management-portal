@@ -314,6 +314,35 @@ export default function ProjectDetail() {
         )}
       </div>
 
+      {project.milestones && project.milestones.length > 0 && (
+        <details style={{ marginBottom: 24 }}>
+          <summary style={styles.logSummary}>Timeline view</summary>
+          <div style={styles.timelineWrap}>
+            {[
+              project.start_date && { date: project.start_date, label: 'Project start', kind: 'project' },
+              ...project.milestones
+                .filter((m) => m.planned_date)
+                .map((m) => ({ date: m.planned_date, label: m.name, kind: m.status === 'done' ? 'done' : 'milestone' })),
+              project.target_completion_date && { date: project.target_completion_date, label: 'Target completion', kind: 'target' },
+            ]
+              .filter(Boolean)
+              .sort((a, b) => new Date(a.date) - new Date(b.date))
+              .map((item, i) => (
+                <div key={i} style={styles.timelineRow}>
+                  <div style={{
+                    ...styles.timelineDot,
+                    background: item.kind === 'done' ? 'var(--success)' : item.kind === 'target' ? 'var(--bupa-blue)' : item.kind === 'project' ? 'var(--text-3)' : 'var(--warning)',
+                  }} />
+                  <div style={styles.timelineContent}>
+                    <p style={styles.timelineDate}>{new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    <p style={styles.timelineLabel}>{item.label}</p>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </details>
+      )}
+
       <div style={styles.sectionHeader}>
         <h2 style={styles.sectionTitle}>Milestones</h2>
         {canEdit && (
@@ -422,6 +451,12 @@ const styles = {
   waitingText: { fontSize: 12, color: 'var(--warning)', margin: 0, fontStyle: 'italic' },
   advanceFormNote: { fontSize: 12.5, color: 'var(--text-2)', margin: 0 },
   logSummary: { fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.03em', cursor: 'pointer' },
+  timelineWrap: { marginTop: 14, paddingLeft: 4 },
+  timelineRow: { display: 'flex', gap: 12, alignItems: 'flex-start', paddingBottom: 14, position: 'relative' },
+  timelineDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0, marginTop: 4 },
+  timelineContent: { flex: 1 },
+  timelineDate: { fontSize: 11.5, color: 'var(--text-3)', margin: '0 0 2px', fontWeight: 600 },
+  timelineLabel: { fontSize: 13.5, color: 'var(--text)', margin: 0, fontWeight: 600 },
   logLine: { fontSize: 12, color: 'var(--text-2)', margin: 0 },
   logTime: { color: 'var(--text-3)' },
   healthForm: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14, padding: 14, background: 'var(--surface-2)', borderRadius: 'var(--radius)' },

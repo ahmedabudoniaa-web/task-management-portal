@@ -2,7 +2,7 @@ import { useAuth } from '../lib/AuthContext'
 import { teamColor } from '../lib/teamColors'
 import { Link, useLocation } from 'react-router-dom'
 
-export default function Shell({ children, teams, teamFilter, setTeamFilter, notifCount, onBellClick, progressPercent }) {
+export default function Shell({ children, teams, teamFilter, setTeamFilter, notifCount, onBellClick, progressPercent, searchSlot }) {
   const { profile, signOut } = useAuth()
   const location = useLocation()
   const onProjects = location.pathname.startsWith('/projects')
@@ -24,8 +24,10 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
       `}</style>
 
       <header className="header-card" style={styles.header}>
-        <div className="shell-blob" style={{ width: 130, height: 130, top: -45, right: 40 }} />
-        <div className="shell-blob" style={{ width: 60, height: 60, bottom: -30, left: 200 }} />
+        <div style={styles.blobLayer}>
+          <div className="shell-blob" style={{ width: 130, height: 130, top: -45, right: 40 }} />
+          <div className="shell-blob" style={{ width: 60, height: 60, bottom: -30, left: 200 }} />
+        </div>
         <div style={styles.headerInner}>
           <div style={styles.topRow}>
             <div style={styles.brandRow}>
@@ -49,6 +51,8 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
                 </Link>
               </div>
             </div>
+
+            {searchSlot && <div style={styles.searchSlotWrap}>{searchSlot}</div>}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <button onClick={onBellClick} className="bell-btn" style={styles.bellButton} aria-label="Notifications">
@@ -109,10 +113,12 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
 const styles = {
   header: {
     background: 'linear-gradient(135deg, #0050A0, #2D8FE0)',
-    position: 'relative', overflow: 'hidden',
+    position: 'relative',
   },
+  blobLayer: { position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' },
   headerInner: { maxWidth: 1100, margin: '0 auto', padding: '20px 24px 18px', position: 'relative' },
-  topRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  topRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 20 },
+  searchSlotWrap: { flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 },
   brandRow: { display: 'flex', alignItems: 'center', gap: 12 },
   navGroup: { display: 'flex', gap: 4, marginLeft: 12, paddingLeft: 16, borderLeft: '1px solid rgba(255,255,255,0.25)' },
   navLink: {
