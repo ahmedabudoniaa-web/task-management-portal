@@ -142,12 +142,18 @@ const styles = {
   filters: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   filterBtn: {
     fontSize: 13, padding: '6px 14px', borderRadius: 999, border: '1px solid var(--border)',
-    background: 'var(--surface)', color: 'var(--text-2)',
+    background: 'var(--surface)', color: 'var(--text-2)', transition: 'all 0.2s',
   },
-  filterBtnActive: { background: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' },
+  filterBtnActive: {
+    background: 'linear-gradient(135deg, rgba(0,229,199,0.22), rgba(61,169,252,0.15))',
+    color: 'var(--pulse)', borderColor: 'var(--border-strong)',
+    boxShadow: '0 0 16px var(--pulse-dim)',
+  },
   newBtn: {
-    display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '8px 16px',
-    borderRadius: 'var(--radius)', border: 'none', background: 'var(--accent)', color: '#fff', flexShrink: 0,
+    display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '9px 18px',
+    borderRadius: 'var(--radius)', border: '1px solid var(--border-strong)',
+    background: 'linear-gradient(135deg, rgba(0,229,199,0.2), rgba(61,169,252,0.12))',
+    color: 'var(--text)', flexShrink: 0, transition: 'all 0.2s', fontFamily: 'var(--font-display)',
   },
   emptyState: { textAlign: 'center', padding: '60px 0', color: 'var(--text-3)' },
   emptyTitle: { fontSize: 15, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 4px' },
