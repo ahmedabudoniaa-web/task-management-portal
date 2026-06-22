@@ -26,3 +26,14 @@ const TEAM_ICONS = {
 export function teamIcon(teamName) {
   return TEAM_ICONS[teamName] || 'ti-checklist'
 }
+
+// RAG (red/amber/green) health colors for projects
+const HEALTH_COLORS = {
+  green: { bg: 'var(--success-light)', text: 'var(--success)', label: 'On track' },
+  amber: { bg: 'var(--warning-light)', text: 'var(--warning)', label: 'Needs attention' },
+  red: { bg: 'var(--danger-light)', text: 'var(--danger)', label: 'Critical' },
+}
+
+export function healthColor(health) {
+  return HEALTH_COLORS[health] || HEALTH_COLORS.green
+}

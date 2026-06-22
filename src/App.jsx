@@ -1,6 +1,9 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import Projects from './pages/Projects'
+import ProjectDetail from './pages/ProjectDetail'
 
 function AppInner() {
   const { session, profile, loading } = useAuth()
@@ -15,7 +18,16 @@ function AppInner() {
 
   if (!session || !profile) return <Login />
 
-  return <Dashboard />
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/projects/:projectId" element={<ProjectDetail />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
 
 export default function App() {

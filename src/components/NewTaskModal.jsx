@@ -11,10 +11,12 @@ export default function NewTaskModal({ teams, people, onClose, onCreated }) {
   const [targetDate, setTargetDate] = useState('')
   const [priority, setPriority] = useState('medium')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setSaving(true)
+    setError(null)
     try {
       await createTask({
         name,
@@ -26,6 +28,8 @@ export default function NewTaskModal({ teams, people, onClose, onCreated }) {
         priority,
       })
       onCreated()
+    } catch (err) {
+      setError(err.message || 'Could not create this task. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -97,6 +101,8 @@ export default function NewTaskModal({ teams, people, onClose, onCreated }) {
               : 'You can add sub-actions and assign collaborators after creating the task.'}
           </p>
 
+          {error && <p style={styles.error}>{error}</p>}
+
           <div style={styles.actions}>
             <button type="button" onClick={onClose} style={styles.secondaryBtn}>Cancel</button>
             <button type="submit" disabled={saving} style={styles.primaryBtn}>
@@ -127,6 +133,7 @@ const styles = {
   input: { fontSize: 14, padding: '9px 11px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' },
   textarea: { fontSize: 14, padding: '9px 11px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', minHeight: 70, resize: 'vertical' },
   hint: { fontSize: 12, color: 'var(--text-3)', margin: 0 },
+  error: { fontSize: 12.5, color: 'var(--danger)', margin: 0, fontWeight: 600 },
   actions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 },
   secondaryBtn: { padding: '9px 16px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'none', color: 'var(--text)', fontSize: 13 },
   primaryBtn: { padding: '9px 18px', borderRadius: 'var(--radius)', border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600 },

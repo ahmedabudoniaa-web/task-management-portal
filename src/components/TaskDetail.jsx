@@ -11,6 +11,9 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
   const [task, setTask] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const [actionError, setActionError] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [confirmingReject, setConfirmingReject] = useState(false)
   const [noteBody, setNoteBody] = useState('')
   const [editingNoteId, setEditingNoteId] = useState(null)
   const [editingBody, setEditingBody] = useState('')
@@ -37,20 +40,51 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
 
   useEffect(() => { load() }, [taskId])
 
+  // Escape key always closes the panel, regardless of loading/error state
+  useEffect(() => {
+    function handleKey(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
   async function refresh() {
     await load()
     onChanged?.()
   }
 
+  // Wraps any mutating action so failures show a message instead of silently doing nothing,
+  // and disables buttons while in flight to prevent double-submits.
+  async function runAction(fn) {
+    setActionError(null)
+    setBusy(true)
+    try {
+      await fn()
+    } catch (err) {
+      setActionError(err.message || 'Something went wrong. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Close button + header rendered identically across loading/error/error states so there's
+  // always a way out without refreshing the page.
+  function ClosePanelHeader() {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button onClick={onClose} style={styles.closeBtn} aria-label="Close task detail">
+          <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden="true" />
+        </button>
+      </div>
+    )
+  }
+
   if (loadError) {
     return (
-      <div style={styles.overlay}>
-        <div style={styles.panel}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button onClick={onClose} style={styles.closeBtn} aria-label="Close">
-              <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden="true" />
-            </button>
-          </div>
+      <div style={styles.overlay} onClick={onClose}>
+        <div style={styles.panel} onClick={(e) => e.stopPropagation()}>
+          <ClosePanelHeader />
           <p style={{ color: 'var(--danger)', fontSize: 14, fontWeight: 600 }}>Couldn't load this task</p>
           <p style={{ color: 'var(--text-2)', fontSize: 13 }}>{loadError}</p>
           <button onClick={load} style={styles.smallBtn}>Try again</button>
@@ -61,8 +95,11 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
 
   if (loading || !task) {
     return (
-      <div style={styles.overlay}>
-        <div style={styles.panel}><p style={{ color: 'var(--text-2)' }}>Loading…</p></div>
+      <div style={styles.overlay} onClick={onClose}>
+        <div style={styles.panel} onClick={(e) => e.stopPropagation()}>
+          <ClosePanelHeader />
+          <p style={{ color: 'var(--text-2)' }}>Loading…</p>
+        </div>
       </div>
     )
   }
@@ -74,86 +111,124 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
 
   const pendingTaskRequest = task.date_change_requests?.find((r) => r.status === 'pending' && r.sub_action_id === null)
 
-  async function handleAccept() {
-    await acceptTask(task.id, profile.id)
-    refresh()
-  }
-
-  async function handleReject() {
-    await rejectTask(task.id, profile.id, task.owner_id, task.name)
-    refresh()
-  }
-
-  async function submitPush(e) {
-    e.preventDefault()
-    if (showPushForm === 'task') {
-      await requestDateChange({
-        taskId: task.id,
-        requestedBy: profile.id,
-        oldDate: task.target_date,
-        newDate: pushDate,
-        reason: pushReason,
-      })
-    } else {
-      await requestDateChange({
-        subActionId: showPushForm,
-        requestedBy: profile.id,
-        oldDate: task.sub_actions.find((s) => s.id === showPushForm)?.deadline,
-        newDate: pushDate,
-        reason: pushReason,
-      })
-    }
-    setShowPushForm(null)
-    setPushDate('')
-    setPushReason('')
-    refresh()
-  }
-
-  async function handleResolve(requestId, approve) {
-    await resolveDateChange({ requestId, approve, resolverId: profile.id })
-    refresh()
-  }
-
-  async function submitSubAction(e) {
-    e.preventDefault()
-    await createSubAction({
-      taskId: task.id,
-      name: subName,
-      deadline: subDeadline || null,
-      assigneeId: subAssignee || null,
-      createdBy: profile.id,
+  function handleAccept() {
+    runAction(async () => {
+      await acceptTask(task.id, profile.id)
+      await refresh()
     })
-    setShowSubForm(false)
-    setSubName(''); setSubDeadline(''); setSubAssignee('')
-    refresh()
   }
 
-  async function submitNote(e) {
+  function handleRejectConfirmed() {
+    setConfirmingReject(false)
+    runAction(async () => {
+      await rejectTask(task.id, profile.id, task.owner_id, task.name)
+      await refresh()
+    })
+  }
+
+  function submitPush(e) {
+    e.preventDefault()
+    runAction(async () => {
+      if (showPushForm === 'task') {
+        await requestDateChange({
+          taskId: task.id,
+          requestedBy: profile.id,
+          oldDate: task.target_date,
+          newDate: pushDate,
+          reason: pushReason,
+        })
+      } else {
+        await requestDateChange({
+          subActionId: showPushForm,
+          requestedBy: profile.id,
+          oldDate: task.sub_actions.find((s) => s.id === showPushForm)?.deadline,
+          newDate: pushDate,
+          reason: pushReason,
+        })
+      }
+      setShowPushForm(null)
+      setPushDate('')
+      setPushReason('')
+      await refresh()
+    })
+  }
+
+  function handleResolve(requestId, approve) {
+    runAction(async () => {
+      await resolveDateChange({ requestId, approve, resolverId: profile.id })
+      await refresh()
+    })
+  }
+
+  function submitSubAction(e) {
+    e.preventDefault()
+    runAction(async () => {
+      await createSubAction({
+        taskId: task.id,
+        name: subName,
+        deadline: subDeadline || null,
+        assigneeId: subAssignee || null,
+        createdBy: profile.id,
+      })
+      setShowSubForm(false)
+      setSubName(''); setSubDeadline(''); setSubAssignee('')
+      await refresh()
+    })
+  }
+
+  function submitNote(e) {
     e.preventDefault()
     if (!noteBody.trim()) return
-    await addNote({ taskId: task.id, authorId: profile.id, body: noteBody })
-    setNoteBody('')
-    refresh()
+    runAction(async () => {
+      await addNote({ taskId: task.id, authorId: profile.id, body: noteBody })
+      setNoteBody('')
+      await refresh()
+    })
   }
 
-  async function saveEditedNote(noteId) {
-    await editNote(noteId, editingBody)
-    setEditingNoteId(null)
-    refresh()
+  function saveEditedNote(noteId) {
+    runAction(async () => {
+      await editNote(noteId, editingBody)
+      setEditingNoteId(null)
+      await refresh()
+    })
+  }
+
+  function toggleSubActionStatus(sa) {
+    runAction(async () => {
+      await updateSubActionStatus(sa.id, sa.status === 'done' ? 'pending' : 'done')
+      await refresh()
+    })
+  }
+
+  function handlePercentChange(percent) {
+    runAction(async () => {
+      await updatePercentComplete(task.id, percent)
+      await refresh()
+    })
   }
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.panel}>
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={styles.panel} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
           <div>
             <p style={styles.team}>{task.team?.name}</p>
             <h2 style={styles.title}>{task.name}</h2>
           </div>
-          <button onClick={onClose} style={styles.closeBtn} aria-label="Close">
+          <button onClick={onClose} style={styles.closeBtn} aria-label="Close task detail">
             <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden="true" />
           </button>
         </div>
+
+        {actionError && (
+          <div style={styles.actionErrorBox}>
+            <p style={styles.actionErrorText}>{actionError}</p>
+            <button onClick={() => setActionError(null)} style={styles.actionErrorDismiss} aria-label="Dismiss error">
+              <i className="ti ti-x" style={{ fontSize: 13 }} aria-hidden="true" />
+            </button>
+          </div>
+        )}
 
         <div style={styles.badgeRow}>
           <StatusBadge status={task.status} />
@@ -173,15 +248,28 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
           </div>
         </div>
 
-        {isAssignee && task.status === 'pending_acceptance' && (
+        {isAssignee && task.status === 'pending_acceptance' && !confirmingReject && (
           <div style={styles.acceptBox}>
             <p style={styles.acceptText}>You've been assigned this task. Accept or reject it.</p>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={handleAccept} style={styles.acceptBtn}>Accept</button>
-              <button onClick={handleReject} style={styles.rejectBtn}>Reject</button>
+              <button onClick={handleAccept} disabled={busy} style={styles.acceptBtn}>Accept</button>
+              <button onClick={() => setConfirmingReject(true)} disabled={busy} style={styles.rejectBtn}>Reject</button>
             </div>
           </div>
         )}
+
+        {isAssignee && task.status === 'pending_acceptance' && confirmingReject && (
+          <div style={styles.acceptBox}>
+            <p style={styles.acceptText}>Reject this task? The owner will be notified and it will become unassigned.</p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={handleRejectConfirmed} disabled={busy} style={styles.rejectBtn}>
+                {busy ? 'Rejecting…' : 'Yes, reject it'}
+              </button>
+              <button onClick={() => setConfirmingReject(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
+            </div>
+          </div>
+        )}
+
 
         {pendingTaskRequest && (
           <div style={styles.pendingBox}>
@@ -195,8 +283,8 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
             </p>
             {canApprove ? (
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => handleResolve(pendingTaskRequest.id, true)} style={styles.smallBtn}>Approve</button>
-                <button onClick={() => handleResolve(pendingTaskRequest.id, false)} style={styles.smallBtnOutline}>Decline</button>
+                <button onClick={() => handleResolve(pendingTaskRequest.id, true)} disabled={busy} style={styles.smallBtn}>Approve</button>
+                <button onClick={() => handleResolve(pendingTaskRequest.id, false)} disabled={busy} style={styles.smallBtnOutline}>Decline</button>
               </div>
             ) : (
               <p style={styles.waitingText}>Waiting on owner approval.</p>
@@ -214,8 +302,8 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
           <form onSubmit={submitPush} style={styles.pushForm}>
             <input type="date" value={pushDate} onChange={(e) => setPushDate(e.target.value)} required style={styles.input} />
             <input value={pushReason} onChange={(e) => setPushReason(e.target.value)} placeholder="Reason" style={{ ...styles.input, flex: 1 }} />
-            <button type="submit" style={styles.smallBtn}>Send</button>
-            <button type="button" onClick={() => setShowPushForm(null)} style={styles.smallBtnOutline}>Cancel</button>
+            <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Sending…' : 'Send'}</button>
+            <button type="button" onClick={() => setShowPushForm(null)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
           </form>
         )}
 
@@ -224,7 +312,8 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
             <p style={styles.sectionLabel}>Progress</p>
             <input
               type="range" min="0" max="100" step="5" value={task.percent_complete}
-              onChange={(e) => updatePercentComplete(task.id, Number(e.target.value)).then(refresh)}
+              onChange={(e) => handlePercentChange(Number(e.target.value))}
+              disabled={busy}
               style={{ flex: 1 }}
             />
             <span style={styles.percentValue}>{task.percent_complete}%</span>
@@ -251,8 +340,8 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
               </select>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="submit" style={styles.smallBtn}>Add action</button>
-              <button type="button" onClick={() => setShowSubForm(false)} style={styles.smallBtnOutline}>Cancel</button>
+              <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Adding…' : 'Add action'}</button>
+              <button type="button" onClick={() => setShowSubForm(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
             </div>
           </form>
         )}
@@ -264,7 +353,7 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
             return (
               <div key={sa.id} style={styles.subRow}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-                  <button onClick={() => updateSubActionStatus(sa.id, sa.status === 'done' ? 'pending' : 'done').then(refresh)} style={styles.checkBtn} aria-label="Toggle done">
+                  <button onClick={() => toggleSubActionStatus(sa)} disabled={busy} style={styles.checkBtn} aria-label="Toggle done">
                     <i className={`ti ${sa.status === 'done' ? 'ti-square-rounded-check-filled' : 'ti-square-rounded'}`} style={{ fontSize: 18, color: sa.status === 'done' ? 'var(--accent)' : 'var(--text-3)' }} aria-hidden="true" />
                   </button>
                   <div>
@@ -280,14 +369,14 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
                 )}
                 {pendingSubRequest && canApprove && (
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => handleResolve(pendingSubRequest.id, true)} style={styles.tinyBtn}>Approve</button>
-                    <button onClick={() => handleResolve(pendingSubRequest.id, false)} style={styles.tinyBtnOutline}>Decline</button>
+                    <button onClick={() => handleResolve(pendingSubRequest.id, true)} disabled={busy} style={styles.tinyBtn}>Approve</button>
+                    <button onClick={() => handleResolve(pendingSubRequest.id, false)} disabled={busy} style={styles.tinyBtnOutline}>Decline</button>
                   </div>
                 )}
                 {showPushForm === sa.id && (
                   <form onSubmit={submitPush} style={styles.pushFormInline}>
                     <input type="date" value={pushDate} onChange={(e) => setPushDate(e.target.value)} required style={styles.input} />
-                    <button type="submit" style={styles.tinyBtn}>Send</button>
+                    <button type="submit" disabled={busy} style={styles.tinyBtn}>{busy ? 'Sending…' : 'Send'}</button>
                   </form>
                 )}
               </div>
@@ -310,7 +399,7 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
                 {editingNoteId === n.id ? (
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                     <input value={editingBody} onChange={(e) => setEditingBody(e.target.value)} style={{ ...styles.input, flex: 1 }} />
-                    <button onClick={() => saveEditedNote(n.id)} style={styles.tinyBtn}>Save</button>
+                    <button onClick={() => saveEditedNote(n.id)} disabled={busy} style={styles.tinyBtn}>Save</button>
                   </div>
                 ) : (
                   <p style={styles.noteBody}>
@@ -326,7 +415,7 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
         {canEditFreely && (
           <form onSubmit={submitNote} style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
             <input value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="Add a note…" style={{ ...styles.input, flex: 1 }} />
-            <button type="submit" style={styles.smallBtn}>Post</button>
+            <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Posting…' : 'Post'}</button>
           </form>
         )}
 
@@ -366,6 +455,12 @@ const styles = {
   title: { fontSize: 20, fontWeight: 600, margin: 0 },
   closeBtn: { background: 'none', border: 'none', color: 'var(--text-2)', flexShrink: 0 },
   badgeRow: { display: 'flex', gap: 8, marginBottom: 16 },
+  actionErrorBox: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10,
+    background: 'var(--danger-light)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 16,
+  },
+  actionErrorText: { fontSize: 13, color: 'var(--danger)', margin: 0, lineHeight: 1.5 },
+  actionErrorDismiss: { background: 'none', border: 'none', color: 'var(--danger)', flexShrink: 0, padding: 2 },
   description: { fontSize: 14, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 20 },
   peopleRow: { display: 'flex', gap: 28, paddingBottom: 18, marginBottom: 18, borderBottom: '1px solid var(--border)' },
   personLabel: { fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.03em', margin: '0 0 3px' },

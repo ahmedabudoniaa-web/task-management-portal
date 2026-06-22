@@ -1,8 +1,11 @@
 import { useAuth } from '../lib/AuthContext'
 import { teamColor } from '../lib/teamColors'
+import { Link, useLocation } from 'react-router-dom'
 
 export default function Shell({ children, teams, teamFilter, setTeamFilter, notifCount, onBellClick, progressPercent }) {
   const { profile, signOut } = useAuth()
+  const location = useLocation()
+  const onProjects = location.pathname.startsWith('/projects')
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -15,6 +18,7 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
         .signout-btn { transition: all 0.15s; }
         .signout-btn:hover { background: var(--surface-2) !important; }
         .header-card { animation: fadeIn 0.35s ease both; }
+        .nav-link { text-decoration: none; transition: all 0.15s; }
       `}</style>
 
       <header className="header-card" style={styles.header}>
@@ -27,6 +31,14 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
               <div>
                 <p style={styles.brandName}>FM Task Management</p>
                 <p style={styles.greeting}>Hey {profile?.full_name?.split(' ')[0]}, here's today</p>
+              </div>
+              <div style={styles.navGroup}>
+                <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onProjects ? styles.navLinkActive : {}) }}>
+                  Tasks
+                </Link>
+                <Link to="/projects" className="nav-link" style={{ ...styles.navLink, ...(onProjects ? styles.navLinkActive : {}) }}>
+                  Projects
+                </Link>
               </div>
             </div>
 
@@ -94,6 +106,12 @@ const styles = {
   headerInner: { maxWidth: 1100, margin: '0 auto', padding: '20px 24px 18px', position: 'relative' },
   topRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   brandRow: { display: 'flex', alignItems: 'center', gap: 12 },
+  navGroup: { display: 'flex', gap: 4, marginLeft: 12, paddingLeft: 16, borderLeft: '1px solid rgba(255,255,255,0.25)' },
+  navLink: {
+    fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)',
+    padding: '6px 12px', borderRadius: 999,
+  },
+  navLinkActive: { color: '#fff', background: 'rgba(255,255,255,0.18)' },
   logo: { width: 36, height: 36, borderRadius: 11, objectFit: 'cover' },
   brandName: { margin: 0, color: '#fff', fontSize: 15.5, fontWeight: 700 },
   greeting: { margin: '1px 0 0', color: 'rgba(255,255,255,0.78)', fontSize: 11.5 },
