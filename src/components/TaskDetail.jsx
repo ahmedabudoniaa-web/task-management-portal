@@ -3,10 +3,12 @@ import { StatusBadge, PriorityBadge } from './Badges'
 import { useAuth } from '../lib/AuthContext'
 import {
   fetchTaskDetail, acceptTask, rejectTask, requestDateChange, resolveDateChange,
-  createSubAction, updateSubActionStatus, addNote, editNote, updatePercentComplete,
+  createSubAction, updateSubActionStatus, addNote, editNote, updatePercentComplete, markTaskDone,
 } from '../lib/tasks'
+import { renderMentionSegments, fetchTaskDependencies, addDependency, removeDependency } from '../lib/dependencies'
+import MentionText from './MentionText'
 
-export default function TaskDetail({ taskId, people, onClose, onChanged }) {
+export default function TaskDetail({ taskId, people, allTasks, onClose, onChanged }) {
   const { profile } = useAuth()
   const [task, setTask] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -24,6 +26,18 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
   const [subName, setSubName] = useState('')
   const [subDeadline, setSubDeadline] = useState('')
   const [subAssignee, setSubAssignee] = useState('')
+  const [dependencies, setDependencies] = useState([])
+  const [showDependencyForm, setShowDependencyForm] = useState(false)
+  const [newBlockerId, setNewBlockerId] = useState('')
+
+  async function loadDependencies() {
+    try {
+      const deps = await fetchTaskDependencies(taskId)
+      setDependencies(deps)
+    } catch {
+      // Non-critical: dependencies failing to load shouldn't block the rest of the panel
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -31,6 +45,7 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
     try {
       const data = await fetchTaskDetail(taskId)
       setTask(data)
+      await loadDependencies()
     } catch (err) {
       setLoadError(err.message || 'Could not load this task.')
     } finally {
@@ -180,7 +195,7 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
     e.preventDefault()
     if (!noteBody.trim()) return
     runAction(async () => {
-      await addNote({ taskId: task.id, authorId: profile.id, body: noteBody })
+      await addNote({ taskId: task.id, authorId: profile.id, body: noteBody, people })
       setNoteBody('')
       await refresh()
     })
@@ -205,6 +220,31 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
     runAction(async () => {
       await updatePercentComplete(task.id, percent)
       await refresh()
+    })
+  }
+
+  function handleMarkDone() {
+    runAction(async () => {
+      await markTaskDone(task.id)
+      await refresh()
+    })
+  }
+
+  function submitDependency(e) {
+    e.preventDefault()
+    if (!newBlockerId) return
+    runAction(async () => {
+      await addDependency({ blockedTaskId: task.id, blockingTaskId: newBlockerId, createdBy: profile.id })
+      setShowDependencyForm(false)
+      setNewBlockerId('')
+      await loadDependencies()
+    })
+  }
+
+  function handleRemoveDependency(dependencyId) {
+    runAction(async () => {
+      await removeDependency(dependencyId)
+      await loadDependencies()
     })
   }
 
@@ -320,6 +360,64 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
           </div>
         )}
 
+        {canEditFreely && task.status !== 'done' && (
+          <button onClick={handleMarkDone} disabled={busy} style={styles.linkBtn}>
+            <i className="ti ti-circle-check" style={{ fontSize: 14 }} aria-hidden="true" /> Mark task as done
+          </button>
+        )}
+
+        <div style={styles.sectionHeader}>
+          <p style={styles.sectionLabel}>Dependencies</p>
+          {canEditFreely && allTasks && (
+            <button onClick={() => setShowDependencyForm(true)} style={styles.addLink}>
+              <i className="ti ti-plus" style={{ fontSize: 13 }} aria-hidden="true" /> Add
+            </button>
+          )}
+        </div>
+
+        {showDependencyForm && (
+          <form onSubmit={submitDependency} style={styles.subForm}>
+            <select value={newBlockerId} onChange={(e) => setNewBlockerId(e.target.value)} required style={styles.input}>
+              <option value="">This task is blocked by…</option>
+              {(allTasks || []).filter((t) => t.id !== task.id).map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Adding…' : 'Add dependency'}</button>
+              <button type="button" onClick={() => setShowDependencyForm(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
+            </div>
+          </form>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+          {dependencies.filter((d) => d.blocked_task.id === task.id).length === 0 && (
+            <p style={styles.emptyText}>No blocking dependencies.</p>
+          )}
+          {dependencies
+            .filter((d) => d.blocked_task.id === task.id)
+            .map((d) => (
+              <div key={d.id} style={styles.dependencyRow}>
+                <span style={styles.dependencyText}>
+                  <i className="ti ti-lock" style={{ fontSize: 13, marginRight: 6, color: d.blocking_task.status === 'done' ? 'var(--success)' : 'var(--warning)' }} aria-hidden="true" />
+                  Blocked by <strong style={{ fontWeight: 700 }}>{d.blocking_task.name}</strong>
+                  {d.blocking_task.status === 'done' ? ' (done)' : ' (not done yet)'}
+                </span>
+                {canEditFreely && (
+                  <button onClick={() => handleRemoveDependency(d.id)} disabled={busy} style={styles.miniLink}>Remove</button>
+                )}
+              </div>
+            ))}
+          {dependencies.filter((d) => d.blocking_task.id === task.id).map((d) => (
+            <div key={d.id} style={styles.dependencyRow}>
+              <span style={styles.dependencyText}>
+                <i className="ti ti-arrow-right" style={{ fontSize: 13, marginRight: 6, color: 'var(--text-3)' }} aria-hidden="true" />
+                Blocking <strong style={{ fontWeight: 700 }}>{d.blocked_task.name}</strong>
+              </span>
+            </div>
+          ))}
+        </div>
+
         <div style={styles.sectionHeader}>
           <p style={styles.sectionLabel}>Sub-actions</p>
           {canEditFreely && (
@@ -403,7 +501,7 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
                   </div>
                 ) : (
                   <p style={styles.noteBody}>
-                    {n.body}
+                    <MentionText text={n.body} people={people} />
                     {(n.author_id === profile.id || profile.is_mbm) && (
                       <button onClick={() => { setEditingNoteId(n.id); setEditingBody(n.body) }} style={styles.editNoteLink}>edit</button>
                     )}
@@ -413,9 +511,11 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
             ))}
         </div>
         {canEditFreely && (
-          <form onSubmit={submitNote} style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-            <input value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="Add a note…" style={{ ...styles.input, flex: 1 }} />
-            <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Posting…' : 'Post'}</button>
+          <form onSubmit={submitNote} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="Add a note… (type @Full Name to mention)" style={{ ...styles.input, flex: 1 }} />
+              <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Posting…' : 'Post'}</button>
+            </div>
           </form>
         )}
 
@@ -484,6 +584,8 @@ const styles = {
   addLink: { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: 'var(--info)', fontSize: 12, fontWeight: 600 },
   subForm: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, padding: 12, background: 'var(--surface-2)', borderRadius: 'var(--radius)' },
   emptyText: { fontSize: 13, color: 'var(--text-3)', fontStyle: 'italic', margin: 0 },
+  dependencyRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: '8px 12px', gap: 8 },
+  dependencyText: { fontSize: 12.5, color: 'var(--text-2)' },
   subRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: '10px 12px', flexWrap: 'wrap', gap: 8 },
   checkBtn: { background: 'none', border: 'none', display: 'flex', flexShrink: 0 },
   subName: { fontSize: 13, fontWeight: 500, margin: 0 },

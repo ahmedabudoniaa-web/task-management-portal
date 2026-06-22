@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { recordMentions } from './dependencies'
 
 // ---------- TASKS ----------
 
@@ -186,9 +187,13 @@ export async function updateSubActionStatus(subActionId, status) {
 
 // ---------- NOTES (free edit, no approval) ----------
 
-export async function addNote({ taskId, authorId, body }) {
-  const { error } = await supabase.from('notes').insert({ task_id: taskId, author_id: authorId, body })
+export async function addNote({ taskId, authorId, body, people }) {
+  const { data, error } = await supabase.from('notes').insert({ task_id: taskId, author_id: authorId, body }).select().single()
   if (error) throw error
+  if (people) {
+    await recordMentions({ text: body, people, entityType: 'note', entityId: data.id, mentioningUserId: authorId, contextTaskId: taskId })
+  }
+  return data
 }
 
 export async function editNote(noteId, body) {
@@ -203,6 +208,15 @@ export async function editNote(noteId, body) {
 
 export async function updatePercentComplete(taskId, percent) {
   const { error } = await supabase.from('tasks').update({ percent_complete: percent }).eq('id', taskId)
+  if (error) throw error
+}
+
+// If the task has unfinished finish-to-start dependencies, the database
+// trigger (enforce_dependency_before_completion) rejects this update and
+// the resulting Postgres error message — which already explains why —
+// surfaces to the UI via the normal error-handling path.
+export async function markTaskDone(taskId) {
+  const { error } = await supabase.from('tasks').update({ status: 'done', percent_complete: 100 }).eq('id', taskId)
   if (error) throw error
 }
 

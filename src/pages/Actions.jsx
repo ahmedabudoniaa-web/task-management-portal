@@ -103,7 +103,7 @@ export default function Actions() {
       )}
 
       {selectedActionId && (
-        <ActionDetail actionId={selectedActionId} onClose={() => setSelectedActionId(null)} onChanged={loadAll} />
+        <ActionDetail actionId={selectedActionId} people={people} onClose={() => setSelectedActionId(null)} onChanged={loadAll} />
       )}
 
       {showNewAction && (

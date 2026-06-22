@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { recordMentions } from './dependencies'
 
 // ---------- STAGE ADVANCE REQUESTS ----------
 
@@ -115,9 +116,13 @@ export async function updateActionStatus({ actionId, status, actorId }) {
   await logAudit({ entityType: 'action', entityId: actionId, actorId, action: 'status_changed', detail: `Status changed to ${status}` })
 }
 
-export async function addActionComment({ actionId, authorId, body }) {
-  const { error } = await supabase.from('action_comments').insert({ action_id: actionId, author_id: authorId, body })
+export async function addActionComment({ actionId, authorId, body, people }) {
+  const { data, error } = await supabase.from('action_comments').insert({ action_id: actionId, author_id: authorId, body }).select().single()
   if (error) throw error
+  if (people) {
+    await recordMentions({ text: body, people, entityType: 'action_comment', entityId: data.id, mentioningUserId: authorId, contextActionId: actionId })
+  }
+  return data
 }
 
 // ---------- AUDIT TRAIL ----------

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/AuthContext'
 import { fetchActionDetail, updateActionStatus, addActionComment, meetingSourceLabel } from '../lib/governance'
+import MentionText from './MentionText'
 
 const STATUS_OPTIONS = [
   { value: 'open', label: 'Open' },
@@ -10,7 +11,7 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
-export default function ActionDetail({ actionId, onClose, onChanged }) {
+export default function ActionDetail({ actionId, people, onClose, onChanged }) {
   const { profile } = useAuth()
   const [action, setAction] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -68,7 +69,7 @@ export default function ActionDetail({ actionId, onClose, onChanged }) {
     e.preventDefault()
     if (!commentBody.trim()) return
     runAction(async () => {
-      await addActionComment({ actionId: action.id, authorId: profile.id, body: commentBody })
+      await addActionComment({ actionId: action.id, authorId: profile.id, body: commentBody, people })
       setCommentBody('')
       await refresh()
     })
@@ -157,12 +158,12 @@ export default function ActionDetail({ actionId, onClose, onChanged }) {
                 <p style={styles.commentMeta}>
                   {c.author?.full_name} · {new Date(c.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                 </p>
-                <p style={styles.commentBody}>{c.body}</p>
+                <p style={styles.commentBody}><MentionText text={c.body} people={people} /></p>
               </div>
             ))}
         </div>
         <form onSubmit={submitComment} style={{ display: 'flex', gap: 8 }}>
-          <input value={commentBody} onChange={(e) => setCommentBody(e.target.value)} placeholder="Add a comment…" style={{ ...styles.input, flex: 1 }} />
+          <input value={commentBody} onChange={(e) => setCommentBody(e.target.value)} placeholder="Add a comment… (type @Full Name to mention)" style={{ ...styles.input, flex: 1 }} />
           <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Posting…' : 'Post'}</button>
         </form>
       </div>

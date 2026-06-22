@@ -116,6 +116,7 @@ export default function Dashboard() {
         <TaskDetail
           taskId={selectedTaskId}
           people={people}
+          allTasks={tasks}
           onClose={() => setSelectedTaskId(null)}
           onChanged={loadAll}
         />
