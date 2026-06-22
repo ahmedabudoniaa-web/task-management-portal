@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Task Management Portal</title>
+    <style>
+      :root {
+        --bg: #F7F6F3;
+        --surface: #FFFFFF;
+        --surface-2: #F0EEE9;
+        --border: #E4E1D9;
+        --text: #1F1D18;
+        --text-2: #6B6759;
+        --text-3: #A8A399;
+        --accent: #2B5C4B;
+        --accent-light: #E4EEEA;
+        --danger: #B3432F;
+        --danger-light: #FAEAE5;
+        --warning: #A8741E;
+        --warning-light: #FAF1DF;
+        --info: #2E5D8A;
+        --info-light: #E7EFF6;
+        --radius: 10px;
+        --radius-lg: 14px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+      }
+      button {
+        font-family: inherit;
+        cursor: pointer;
+      }
+      input, select, textarea {
+        font-family: inherit;
+      }
+      #root { min-height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
