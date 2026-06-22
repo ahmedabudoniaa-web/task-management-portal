@@ -2,6 +2,7 @@
 // Falls back to a neutral gray-blue if a team name isn't recognized.
 const TEAM_COLORS = {
   Engineering: { dot: '#7FB8E8', tile: '#D5E9F8', icon: '#2B6CA3', card: '#EAF4FB' },
+  Operation: { dot: '#F2B879', tile: '#FAE3C7', icon: '#B36B1E', card: '#FCF1E6' },
   Operations: { dot: '#F2B879', tile: '#FAE3C7', icon: '#B36B1E', card: '#FCF1E6' },
   'Health and Safety': { dot: '#F29DA8', tile: '#F8D4D9', icon: '#B33E54', card: '#FCEBED' },
   Property: { dot: '#A8D9B8', tile: '#D3EEDB', icon: '#2D7D4C', card: '#EDF7F0' },
@@ -17,6 +18,7 @@ export function teamColor(teamName) {
 // Icon per team for task cards (Tabler icon class suffix)
 const TEAM_ICONS = {
   Engineering: 'ti-cpu',
+  Operation: 'ti-truck-delivery',
   Operations: 'ti-truck-delivery',
   'Health and Safety': 'ti-shield-check',
   Property: 'ti-home-2',

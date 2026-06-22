@@ -11,7 +11,7 @@ export function AuthProvider({ children }) {
   async function loadProfile(userId) {
     const { data } = await supabase
       .from('profiles')
-      .select('*, team:teams(id, name)')
+      .select('*, team:teams(id, name), manager:profiles!profiles_manager_id_fkey(id, full_name, email)')
       .eq('id', userId)
       .single()
 
@@ -30,7 +30,44 @@ export function AuthProvider({ children }) {
       managedTeams = []
     }
 
-    setProfile(data ? { ...data, managed_team_ids: managedTeamIds, managed_teams: managedTeams } : data)
+    let managedProfileIds = []
+    let managedProfiles = []
+    try {
+      const { data: allProfiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, team_id, manager_id, role, job_title')
+
+      const byManager = new Map()
+      for (const person of allProfiles || []) {
+        if (!person.manager_id) continue
+        const list = byManager.get(person.manager_id) || []
+        list.push(person)
+        byManager.set(person.manager_id, list)
+      }
+
+      const queue = [...(byManager.get(userId) || [])]
+      const seen = new Set()
+      while (queue.length > 0) {
+        const person = queue.shift()
+        if (!person?.id || seen.has(person.id)) continue
+        seen.add(person.id)
+        managedProfiles.push(person)
+        for (const child of byManager.get(person.id) || []) queue.push(child)
+      }
+      managedProfileIds = [...seen]
+    } catch {
+      // manager_id exists only after the org hierarchy migration.
+      managedProfileIds = []
+      managedProfiles = []
+    }
+
+    setProfile(data ? {
+      ...data,
+      managed_team_ids: managedTeamIds,
+      managed_teams: managedTeams,
+      managed_profile_ids: managedProfileIds,
+      managed_profiles: managedProfiles,
+    } : data)
   }
 
   useEffect(() => {

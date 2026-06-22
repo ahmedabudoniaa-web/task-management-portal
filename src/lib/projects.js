@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { isMBM, managedTeamIds, profileTeamIds } from './permissions'
+import { isMBM, managedTeamIds, managedProfileIds, profileTeamIds } from './permissions'
 import { logAudit } from './governance'
 
 // ---------- PROJECTS ----------
@@ -18,11 +18,13 @@ export async function fetchProjects({ profile, teamFilter }) {
 
   if (!isMBM(profile)) {
     const directorTeams = managedTeamIds(profile)
+    const reportIds = managedProfileIds(profile)
     if (directorTeams.length > 0) query = query.in('team_id', directorTeams)
-    else {
-      const teams = profileTeamIds(profile)
-      if (teams.length > 1) query = query.in('team_id', teams)
-      else query = query.or(`team_id.eq.${profile.team_id},sponsor_id.eq.${profile.id},project_manager_id.eq.${profile.id}`)
+    else if (reportIds.length > 0) {
+      const ids = [profile.id, ...reportIds]
+      query = query.or(`sponsor_id.in.(${ids.join(',')}),project_manager_id.in.(${ids.join(',')}),created_by.in.(${ids.join(',')})`)
+    } else {
+      query = query.or(`sponsor_id.eq.${profile.id},project_manager_id.eq.${profile.id},created_by.eq.${profile.id}`)
     }
   }
   if (teamFilter) {

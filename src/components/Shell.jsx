@@ -2,12 +2,12 @@ import { useAuth } from '../lib/AuthContext'
 import { teamColor } from '../lib/teamColors'
 import { Link, useLocation } from 'react-router-dom'
 import HeaderSearch from './HeaderSearch'
-import { isMBM, managedTeamIds } from '../lib/permissions'
+import { isMBM, profileTeamIds } from '../lib/permissions'
 
 export default function Shell({ children, teams, teamFilter, setTeamFilter, notifCount, onBellClick, progressPercent, searchSlot }) {
   const { profile, signOut } = useAuth()
-  const directorTeamIds = new Set(managedTeamIds(profile))
-  const visibleTeamTabs = isMBM(profile) ? teams : teams.filter((t) => directorTeamIds.has(t.id))
+  const visibleTeamIds = new Set(profileTeamIds(profile))
+  const visibleTeamTabs = isMBM(profile) ? teams : teams.filter((t) => visibleTeamIds.has(t.id))
   const location = useLocation()
   const onPortfolio = location.pathname.startsWith('/portfolio')
   const onProjects = location.pathname.startsWith('/projects')

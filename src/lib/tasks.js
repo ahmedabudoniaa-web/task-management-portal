@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { recordMentions } from './dependencies'
-import { isMBM, managedTeamIds, profileTeamIds } from './permissions'
+import { isMBM, managedTeamIds, managedProfileIds, profileTeamIds } from './permissions'
 
 // Wraps a Supabase call so a raw network failure ("Failed to fetch", which
 // the browser throws with no further detail when a request can't reach the
@@ -40,13 +40,24 @@ export async function fetchTasks({ profile, teamFilter, assigneeFilter, scope })
     query = query.or(`owner_id.eq.${profile.id},assignee_id.eq.${profile.id}`)
   } else if (!isMBM(profile)) {
     const directorTeams = managedTeamIds(profile)
-    if (scope === 'team' && directorTeams.length > 0) {
-      query = query.in('team_id', directorTeams)
+    const reportIds = managedProfileIds(profile)
+
+    if (scope === 'team') {
+      if (directorTeams.length > 0) {
+        // Principal managers/directors: see the teams assigned to them
+        // even when the team has managers below them.
+        query = query.in('team_id', directorTeams)
+      } else if (reportIds.length > 0) {
+        // Middle managers: see only work owned/assigned to their reporting line.
+        const ids = [profile.id, ...reportIds]
+        query = query.or(`owner_id.in.(${ids.join(',')}),assignee_id.in.(${ids.join(',')})`)
+      } else {
+        query = query.or(`owner_id.eq.${profile.id},assignee_id.eq.${profile.id}`)
+      }
     } else {
       const visibleTeams = profileTeamIds(profile)
-      const parts = [`owner_id.eq.${profile.id}`, `assignee_id.eq.${profile.id}`]
-      if (visibleTeams.length === 1) parts.unshift(`team_id.eq.${visibleTeams[0]}`)
-      query = visibleTeams.length > 1 ? query.in('team_id', visibleTeams) : query.or(parts.join(','))
+      if (visibleTeams.length > 0) query = query.in('team_id', visibleTeams)
+      else query = query.or(`owner_id.eq.${profile.id},assignee_id.eq.${profile.id}`)
     }
   }
   if (teamFilter) query = query.eq('team_id', teamFilter)
