@@ -37,7 +37,7 @@ export async function fetchProjectDetail(projectId) {
       team:teams(id, name),
       sponsor:profiles!projects_sponsor_id_fkey(id, full_name),
       project_manager:profiles!projects_project_manager_id_fkey(id, full_name),
-      milestones(*, owner:profiles(id, full_name), tasks(id, name, status, percent_complete, assignee:profiles!tasks_assignee_id_fkey(id, full_name))),
+      milestones(*, owner:profiles!milestones_owner_id_fkey(id, full_name), tasks(id, name, status, percent_complete, assignee:profiles!tasks_assignee_id_fkey(id, full_name))),
       project_health_log(*, changer:profiles(id, full_name))
     `)
     .eq('id', projectId)

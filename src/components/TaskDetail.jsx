@@ -3,7 +3,8 @@ import { StatusBadge, PriorityBadge } from './Badges'
 import { useAuth } from '../lib/AuthContext'
 import {
   fetchTaskDetail, acceptTask, rejectTask, requestDateChange, resolveDateChange,
-  createSubAction, updateSubActionStatus, addNote, editNote, updatePercentComplete, markTaskDone,
+  createSubAction, updateSubActionStatus, addNote, editNote, markTaskDone,
+  assignTask, deleteTask,
 } from '../lib/tasks'
 import { renderMentionSegments, fetchTaskDependencies, addDependency, removeDependency } from '../lib/dependencies'
 import MentionText from './MentionText'
@@ -29,6 +30,10 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
   const [dependencies, setDependencies] = useState([])
   const [showDependencyForm, setShowDependencyForm] = useState(false)
   const [newBlockerId, setNewBlockerId] = useState('')
+  const [showAssignForm, setShowAssignForm] = useState(false)
+  const [newAssigneeId, setNewAssigneeId] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [subDescription, setSubDescription] = useState('')
 
   async function loadDependencies() {
     try {
@@ -123,6 +128,8 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
   const isAssignee = task.assignee_id === profile.id
   const canApprove = isOwner || profile.is_mbm
   const canEditFreely = isOwner || isAssignee || profile.is_mbm
+  const isUnassigned = !task.assignee_id
+  const isDelayed = task.status !== 'done' && task.target_date && new Date(task.target_date) < new Date()
 
   const pendingTaskRequest = task.date_change_requests?.find((r) => r.status === 'pending' && r.sub_action_id === null)
 
@@ -181,12 +188,13 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
       await createSubAction({
         taskId: task.id,
         name: subName,
+        description: subDescription,
         deadline: subDeadline || null,
         assigneeId: subAssignee || null,
         createdBy: profile.id,
       })
       setShowSubForm(false)
-      setSubName(''); setSubDeadline(''); setSubAssignee('')
+      setSubName(''); setSubDescription(''); setSubDeadline(''); setSubAssignee('')
       await refresh()
     })
   }
@@ -216,13 +224,6 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
     })
   }
 
-  function handlePercentChange(percent) {
-    runAction(async () => {
-      await updatePercentComplete(task.id, percent)
-      await refresh()
-    })
-  }
-
   function handleMarkDone() {
     runAction(async () => {
       await markTaskDone(task.id)
@@ -248,18 +249,55 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
     })
   }
 
+  function submitAssign(e) {
+    e.preventDefault()
+    if (!newAssigneeId) return
+    runAction(async () => {
+      await assignTask({ taskId: task.id, ownerId: task.owner_id, assigneeId: newAssigneeId, taskName: task.name })
+      setShowAssignForm(false)
+      setNewAssigneeId('')
+      await refresh()
+    })
+  }
+
+  function handleDeleteConfirmed() {
+    setConfirmingDelete(false)
+    runAction(async () => {
+      await deleteTask(task.id)
+      onClose()
+      onChanged?.()
+    })
+  }
+
   return (
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.panel} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
-          <div>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <p style={styles.team}>{task.team?.name}</p>
             <h2 style={styles.title}>{task.name}</h2>
           </div>
-          <button onClick={onClose} style={styles.closeBtn} aria-label="Close task detail">
-            <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden="true" />
-          </button>
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+            {isOwner && !confirmingDelete && (
+              <button onClick={() => setConfirmingDelete(true)} style={styles.deleteIconBtn} aria-label="Delete task">
+                <i className="ti ti-trash" style={{ fontSize: 17 }} aria-hidden="true" />
+              </button>
+            )}
+            <button onClick={onClose} style={styles.closeBtn} aria-label="Close task detail">
+              <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden="true" />
+            </button>
+          </div>
         </div>
+
+        {confirmingDelete && (
+          <div style={styles.deleteConfirmBox}>
+            <p style={styles.deleteConfirmText}>Delete this task permanently? This removes all its sub-actions, notes, and history.</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={handleDeleteConfirmed} disabled={busy} style={styles.deleteConfirmBtn}>{busy ? 'Deleting…' : 'Yes, delete it'}</button>
+              <button onClick={() => setConfirmingDelete(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
+            </div>
+          </div>
+        )}
 
         {actionError && (
           <div style={styles.actionErrorBox}>
@@ -271,7 +309,7 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
         )}
 
         <div style={styles.badgeRow}>
-          <StatusBadge status={task.status} />
+          <StatusBadge status={task.status} isDelayed={isDelayed} />
           <PriorityBadge priority={task.priority} />
         </div>
 
@@ -287,6 +325,26 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
             </p>
           </div>
         </div>
+
+        {isOwner && isUnassigned && !showAssignForm && (
+          <button onClick={() => setShowAssignForm(true)} style={styles.linkBtn}>
+            <i className="ti ti-user-plus" style={{ fontSize: 14 }} aria-hidden="true" /> Assign this task
+          </button>
+        )}
+
+        {isOwner && showAssignForm && (
+          <form onSubmit={submitAssign} style={styles.pushForm}>
+            <select value={newAssigneeId} onChange={(e) => setNewAssigneeId(e.target.value)} required style={{ ...styles.input, flex: 1 }}>
+              <option value="">Choose a person…</option>
+              <option value={task.owner_id}>Myself</option>
+              {people.filter((p) => p.id !== task.owner_id).map((p) => (
+                <option key={p.id} value={p.id}>{p.full_name}</option>
+              ))}
+            </select>
+            <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Assigning…' : 'Assign'}</button>
+            <button type="button" onClick={() => setShowAssignForm(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
+          </form>
+        )}
 
         {isAssignee && task.status === 'pending_acceptance' && !confirmingReject && (
           <div style={styles.acceptBox}>
@@ -347,23 +405,33 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
           </form>
         )}
 
-        {canEditFreely && (
-          <div style={styles.percentRow}>
-            <p style={styles.sectionLabel}>Progress</p>
-            <input
-              type="range" min="0" max="100" step="5" value={task.percent_complete}
-              onChange={(e) => handlePercentChange(Number(e.target.value))}
-              disabled={busy}
-              style={{ flex: 1 }}
-            />
-            <span style={styles.percentValue}>{task.percent_complete}%</span>
+        {canEditFreely && task.status !== 'done' && task.status !== 'unassigned' && task.status !== 'pending_acceptance' && (
+          <div style={styles.statusButtonRow}>
+            <p style={styles.sectionLabel}>Status</p>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ ...styles.statusPill, ...(task.status === 'in_progress' ? styles.statusPillActive : {}) }}>
+                <i className="ti ti-player-play" style={{ fontSize: 12 }} aria-hidden="true" /> In progress
+              </span>
+              {isDelayed && (
+                <span style={styles.statusPillDelayed}>
+                  <i className="ti ti-alert-triangle" style={{ fontSize: 12 }} aria-hidden="true" /> Delayed — past target date
+                </span>
+              )}
+            </div>
           </div>
         )}
 
         {canEditFreely && task.status !== 'done' && (
-          <button onClick={handleMarkDone} disabled={busy} style={styles.linkBtn}>
-            <i className="ti ti-circle-check" style={{ fontSize: 14 }} aria-hidden="true" /> Mark task as done
+          <button onClick={handleMarkDone} disabled={busy} style={styles.markDoneBtn}>
+            <i className="ti ti-circle-check" style={{ fontSize: 16 }} aria-hidden="true" /> {busy ? 'Marking done…' : 'Mark task as done'}
           </button>
+        )}
+
+        {task.status === 'done' && (
+          <div style={styles.doneBanner}>
+            <i className="ti ti-circle-check-filled" style={{ fontSize: 16, color: 'var(--success)' }} aria-hidden="true" />
+            <span style={styles.doneBannerText}>Completed</span>
+          </div>
         )}
 
         <div style={styles.sectionHeader}>
@@ -430,6 +498,7 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
         {showSubForm && (
           <form onSubmit={submitSubAction} style={styles.subForm}>
             <input value={subName} onChange={(e) => setSubName(e.target.value)} placeholder="Action name" required style={styles.input} />
+            <textarea value={subDescription} onChange={(e) => setSubDescription(e.target.value)} placeholder="Description (optional)" style={styles.textarea} />
             <div style={{ display: 'flex', gap: 8 }}>
               <input type="date" value={subDeadline} onChange={(e) => setSubDeadline(e.target.value)} style={{ ...styles.input, flex: 1 }} />
               <select value={subAssignee} onChange={(e) => setSubAssignee(e.target.value)} style={{ ...styles.input, flex: 1 }}>
@@ -450,12 +519,13 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
             const pendingSubRequest = task.date_change_requests?.find((r) => r.status === 'pending' && r.sub_action_id === sa.id)
             return (
               <div key={sa.id} style={styles.subRow}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
-                  <button onClick={() => toggleSubActionStatus(sa)} disabled={busy} style={styles.checkBtn} aria-label="Toggle done">
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1 }}>
+                  <button onClick={() => toggleSubActionStatus(sa)} disabled={busy} style={{ ...styles.checkBtn, marginTop: 1 }} aria-label="Toggle done">
                     <i className={`ti ${sa.status === 'done' ? 'ti-square-rounded-check-filled' : 'ti-square-rounded'}`} style={{ fontSize: 18, color: sa.status === 'done' ? 'var(--accent)' : 'var(--text-3)' }} aria-hidden="true" />
                   </button>
                   <div>
                     <p style={{ ...styles.subName, textDecoration: sa.status === 'done' ? 'line-through' : 'none' }}>{sa.name}</p>
+                    {sa.description && <p style={styles.subDescription}>{sa.description}</p>}
                     <p style={styles.subMeta}>
                       {sa.assignee?.full_name || 'Unassigned'}
                       {sa.deadline ? ` · ${new Date(sa.deadline).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
@@ -549,12 +619,16 @@ function Person({ label, person, placeholder }) {
 
 const styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', justifyContent: 'flex-end', zIndex: 100 },
-  panel: { background: 'var(--surface)', width: '100%', maxWidth: 560, height: '100%', overflowY: 'auto', padding: '28px 30px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  panel: { background: 'var(--surface)', width: '100%', maxWidth: 560, height: '100%', overflowY: 'auto', overflowX: 'hidden', padding: '24px 20px', boxSizing: 'border-box' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, gap: 10 },
   team: { fontSize: 12, fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' },
-  title: { fontSize: 20, fontWeight: 600, margin: 0 },
-  closeBtn: { background: 'none', border: 'none', color: 'var(--text-2)', flexShrink: 0 },
-  badgeRow: { display: 'flex', gap: 8, marginBottom: 16 },
+  title: { fontSize: 19, fontWeight: 700, margin: 0, wordBreak: 'break-word' },
+  closeBtn: { background: 'none', border: 'none', color: 'var(--text-2)', flexShrink: 0, padding: 4 },
+  deleteIconBtn: { background: 'none', border: 'none', color: 'var(--text-3)', flexShrink: 0, padding: 4 },
+  deleteConfirmBox: { background: 'var(--danger-light)', borderRadius: 'var(--radius)', padding: '12px 14px', marginBottom: 16 },
+  deleteConfirmText: { fontSize: 13, color: 'var(--danger)', margin: '0 0 10px', lineHeight: 1.5 },
+  deleteConfirmBtn: { padding: '8px 16px', borderRadius: 'var(--radius)', border: 'none', background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 700 },
+  badgeRow: { display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
   actionErrorBox: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10,
     background: 'var(--danger-light)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 16,
@@ -577,8 +651,34 @@ const styles = {
   pushForm: { display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' },
   pushFormInline: { display: 'flex', gap: 8, marginTop: 8, width: '100%' },
   input: { fontSize: 13, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' },
-  percentRow: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 },
-  percentValue: { fontSize: 13, fontWeight: 600, minWidth: 36, textAlign: 'right' },
+  statusButtonRow: { marginBottom: 14 },
+  statusPill: {
+    fontSize: 12.5, fontWeight: 600, padding: '6px 13px', borderRadius: 999,
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    background: 'var(--surface-2)', color: 'var(--text-2)',
+  },
+  statusPillActive: { background: 'var(--info-light)', color: 'var(--info)' },
+  statusPillDelayed: {
+    fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 999,
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    background: 'var(--danger-light)', color: 'var(--danger)',
+  },
+  markDoneBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%',
+    fontSize: 14.5, fontWeight: 700, padding: '13px 0', borderRadius: 'var(--radius)', border: 'none',
+    background: 'linear-gradient(135deg, #1A8754, #2DA86A)', color: '#fff', marginBottom: 20,
+    boxShadow: '0 2px 10px rgba(26,135,84,0.25)',
+  },
+  doneBanner: {
+    display: 'flex', alignItems: 'center', gap: 8, background: 'var(--success-light)',
+    borderRadius: 'var(--radius)', padding: '12px 16px', marginBottom: 20,
+  },
+  doneBannerText: { fontSize: 14, fontWeight: 700, color: 'var(--success)' },
+  textarea: {
+    fontSize: 13, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+    background: '#fff', color: 'var(--text)', minHeight: 56, fontFamily: 'inherit', resize: 'vertical',
+  },
+  subDescription: { fontSize: 12, color: 'var(--text-2)', margin: '2px 0 4px', lineHeight: 1.4 },
   sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionLabel: { fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.03em', margin: '0 0 10px' },
   addLink: { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: 'var(--info)', fontSize: 12, fontWeight: 600 },

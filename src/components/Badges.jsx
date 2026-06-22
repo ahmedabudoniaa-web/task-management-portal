@@ -5,6 +5,7 @@ const STATUS_STYLES = {
   blocked: { bg: 'var(--danger-light)', text: 'var(--danger)', label: 'Blocked' },
   done: { bg: 'var(--success-light)', text: 'var(--success)', label: 'Done' },
   rejected: { bg: 'var(--danger-light)', text: 'var(--danger)', label: 'Rejected' },
+  delayed: { bg: 'var(--danger-light)', text: 'var(--danger)', label: 'Delayed' },
 }
 
 const PRIORITY_STYLES = {
@@ -27,8 +28,8 @@ function Badge({ bg, text, label }) {
   )
 }
 
-export function StatusBadge({ status }) {
-  const s = STATUS_STYLES[status] || STATUS_STYLES.unassigned
+export function StatusBadge({ status, isDelayed }) {
+  const s = isDelayed && status !== 'done' ? STATUS_STYLES.delayed : (STATUS_STYLES[status] || STATUS_STYLES.unassigned)
   return <Badge {...s} />
 }
 

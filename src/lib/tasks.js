@@ -98,6 +98,30 @@ export async function rejectTask(taskId, userId, ownerId, taskName) {
   await notify(ownerId, taskId, 'rejected', `Task rejected: "${taskName}" is now unassigned`)
 }
 
+// Assigns (or reassigns) an unassigned task. Mirrors createTask's status
+// logic: self-assignment skips the accept/reject step entirely, assigning
+// someone else puts it in pending_acceptance.
+export async function assignTask({ taskId, ownerId, assigneeId, taskName }) {
+  const status = assigneeId === ownerId ? 'in_progress' : 'pending_acceptance'
+  const { error } = await supabase
+    .from('tasks')
+    .update({ assignee_id: assigneeId, status })
+    .eq('id', taskId)
+  if (error) throw error
+  await logChange(taskId, ownerId, 'assigned', `Task assigned`)
+  if (assigneeId !== ownerId) {
+    await notify(assigneeId, taskId, 'assigned', `You've been assigned: "${taskName}"`)
+  }
+}
+
+// Owner-only hard delete. Cascades to sub_actions, notes, change_log,
+// date_change_requests, and task_dependencies via their on-delete-cascade
+// foreign keys — nothing orphaned.
+export async function deleteTask(taskId) {
+  const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+  if (error) throw error
+}
+
 // ---------- DEADLINE PUSH (approval-gated) ----------
 
 export async function requestDateChange({ taskId, subActionId, requestedBy, oldDate, newDate, reason }) {
@@ -169,10 +193,10 @@ export async function resolveDateChange({ requestId, approve, resolverId }) {
 
 // ---------- SUB-ACTIONS ----------
 
-export async function createSubAction({ taskId, name, deadline, assigneeId, createdBy }) {
+export async function createSubAction({ taskId, name, description, deadline, assigneeId, createdBy }) {
   const { data, error } = await supabase
     .from('sub_actions')
-    .insert({ task_id: taskId, name, deadline, assignee_id: assigneeId || null, created_by: createdBy })
+    .insert({ task_id: taskId, name, description: description || null, deadline, assignee_id: assigneeId || null, created_by: createdBy })
     .select()
     .single()
   if (error) throw error

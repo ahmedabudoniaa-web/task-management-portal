@@ -20,7 +20,7 @@ export default function TaskCard({ task, onClick }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={styles.topRow}>
             <p style={styles.name}>{task.name}</p>
-            <StatusBadge status={task.status} />
+            <StatusBadge status={task.status} isDelayed={task.status !== 'done' && task.target_date && new Date(task.target_date) < new Date()} />
           </div>
           <div style={styles.metaRow}>
             <span style={styles.metaItem}>
