@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { createTask } from '../lib/tasks'
 import { useAuth } from '../lib/AuthContext'
+import { availableTeamsForCreation, isMBM, isDirector, peopleVisibleForTeam } from '../lib/permissions'
 
 export default function NewTaskModal({ teams, people, projects, onClose, onCreated }) {
   const { profile } = useAuth()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [teamId, setTeamId] = useState(profile.team_id)
+  const allowedTeams = availableTeamsForCreation(profile, teams)
+  const [teamId, setTeamId] = useState(profile.team_id || allowedTeams[0]?.id || '')
   const [projectId, setProjectId] = useState('')
   const [assigneeId, setAssigneeId] = useState(profile.id)
   const [targetDate, setTargetDate] = useState('')
@@ -51,7 +53,8 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
     }
   }
 
-  const peopleInTeam = people.filter((p) => p.team_id === teamId || profile.is_mbm)
+  const peopleInTeam = peopleVisibleForTeam(profile, people, teamId)
+  const canAssignTeamQueue = isMBM(profile) || isDirector(profile)
 
   return (
     <div style={styles.overlay} onClick={onClose}>
@@ -79,7 +82,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
             <label style={styles.label}>
               Team <span style={styles.required}>*</span>
               <select value={teamId} onChange={(e) => setTeamId(e.target.value)} style={styles.input}>
-                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {allowedTeams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </label>
             <label style={styles.label}>
@@ -107,7 +110,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
             <label style={styles.label}>
               Assign to
               <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} style={styles.input}>
-                <option value="">Leave unassigned</option>
+                {canAssignTeamQueue && <option value="">Assign to team queue</option>}
                 <option value={profile.id}>Myself</option>
                 {peopleInTeam.filter((p) => p.id !== profile.id).map((p) => (
                   <option key={p.id} value={p.id}>{p.full_name} ({p.team?.name})</option>
@@ -161,7 +164,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
                   style={{ ...styles.input, marginTop: 8 }}
                 >
                   <option value="">Sub-action unassigned</option>
-                  {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  {peopleVisibleForTeam(profile, people, teamId).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
               </div>
             ))}
@@ -170,7 +173,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
           <div style={styles.footer}>
             <div>
               {error && <p style={styles.error}>{error}</p>}
-              <p style={styles.hint}>{assigneeId && assigneeId !== profile.id ? 'The assignee will need to accept this task.' : 'Only filled sub-actions will be created.'}</p>
+              <p style={styles.hint}>{!assigneeId ? 'This task will go to the selected team queue for the director to assign.' : assigneeId !== profile.id ? 'The assignee will need to accept this task.' : 'Only filled sub-actions will be created.'}</p>
             </div>
             <div style={styles.actions}>
               <button type="button" onClick={onClose} disabled={saving} style={styles.secondaryBtn}>Cancel</button>

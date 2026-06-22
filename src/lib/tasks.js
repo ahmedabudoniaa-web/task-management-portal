@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { recordMentions } from './dependencies'
+import { isMBM, managedTeamIds, profileTeamIds } from './permissions'
 
 // Wraps a Supabase call so a raw network failure ("Failed to fetch", which
 // the browser throws with no further detail when a request can't reach the
@@ -37,10 +38,16 @@ export async function fetchTasks({ profile, teamFilter, assigneeFilter, scope })
   // so delegated sub-tasks appear in the assignee's dashboard too.
   if (scope === 'mine') {
     query = query.or(`owner_id.eq.${profile.id},assignee_id.eq.${profile.id}`)
-  } else if (!profile.is_mbm) {
-    query = query.or(
-      `team_id.eq.${profile.team_id},owner_id.eq.${profile.id},assignee_id.eq.${profile.id}`
-    )
+  } else if (!isMBM(profile)) {
+    const directorTeams = managedTeamIds(profile)
+    if (scope === 'team' && directorTeams.length > 0) {
+      query = query.in('team_id', directorTeams)
+    } else {
+      const visibleTeams = profileTeamIds(profile)
+      const parts = [`owner_id.eq.${profile.id}`, `assignee_id.eq.${profile.id}`]
+      if (visibleTeams.length === 1) parts.unshift(`team_id.eq.${visibleTeams[0]}`)
+      query = visibleTeams.length > 1 ? query.in('team_id', visibleTeams) : query.or(parts.join(','))
+    }
   }
   if (teamFilter) query = query.eq('team_id', teamFilter)
   if (assigneeFilter) query = query.eq('assignee_id', assigneeFilter)

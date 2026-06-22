@@ -14,7 +14,23 @@ export function AuthProvider({ children }) {
       .select('*, team:teams(id, name)')
       .eq('id', userId)
       .single()
-    setProfile(data)
+
+    let managedTeamIds = []
+    let managedTeams = []
+    try {
+      const { data: directorRows } = await supabase
+        .from('team_directors')
+        .select('team_id, team:teams(id, name)')
+        .eq('director_id', userId)
+      managedTeamIds = (directorRows || []).map((r) => r.team_id).filter(Boolean)
+      managedTeams = (directorRows || []).map((r) => r.team).filter(Boolean)
+    } catch {
+      // The app still works before the role SQL migration is applied.
+      managedTeamIds = []
+      managedTeams = []
+    }
+
+    setProfile(data ? { ...data, managed_team_ids: managedTeamIds, managed_teams: managedTeams } : data)
   }
 
   useEffect(() => {

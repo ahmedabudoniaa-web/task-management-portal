@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { isMBM, managedTeamIds, profileTeamIds } from './permissions'
 import { recordMentions } from './dependencies'
 
 // ---------- STAGE ADVANCE REQUESTS ----------
@@ -65,8 +66,14 @@ export async function fetchActions({ profile, teamFilter }) {
     `)
     .order('due_date', { ascending: true, nullsFirst: false })
 
-  if (!profile.is_mbm) {
-    query = query.or(`team_id.eq.${profile.team_id},owner_id.eq.${profile.id},created_by.eq.${profile.id}`)
+  if (!isMBM(profile)) {
+    const directorTeams = managedTeamIds(profile)
+    if (directorTeams.length > 0) query = query.in('team_id', directorTeams)
+    else {
+      const teams = profileTeamIds(profile)
+      if (teams.length > 1) query = query.in('team_id', teams)
+      else query = query.or(`team_id.eq.${profile.team_id},owner_id.eq.${profile.id},created_by.eq.${profile.id}`)
+    }
   }
   if (teamFilter) {
     query = query.eq('team_id', teamFilter)

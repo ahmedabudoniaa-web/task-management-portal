@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createAction } from '../lib/governance'
 import { useAuth } from '../lib/AuthContext'
+import { availableTeamsForCreation, peopleVisibleForTeam } from '../lib/permissions'
 
 const SOURCES = [
   { value: 'leadership_meeting', label: 'Leadership meeting' },
@@ -14,7 +15,8 @@ const SOURCES = [
 export default function NewActionModal({ teams, people, onClose, onCreated }) {
   const { profile } = useAuth()
   const [title, setTitle] = useState('')
-  const [teamId, setTeamId] = useState(profile.team_id)
+  const allowedTeams = availableTeamsForCreation(profile, teams)
+  const [teamId, setTeamId] = useState(profile.team_id || allowedTeams[0]?.id || '')
   const [ownerId, setOwnerId] = useState(profile.id)
   const [dueDate, setDueDate] = useState('')
   const [priority, setPriority] = useState('medium')
@@ -39,7 +41,7 @@ export default function NewActionModal({ teams, people, onClose, onCreated }) {
     }
   }
 
-  const peopleInTeam = people.filter((p) => p.team_id === teamId || profile.is_mbm)
+  const peopleInTeam = peopleVisibleForTeam(profile, people, teamId)
 
   return (
     <div style={styles.overlay} onClick={onClose}>
@@ -73,7 +75,7 @@ export default function NewActionModal({ teams, people, onClose, onCreated }) {
             <label style={styles.label}>
               Team
               <select value={teamId} onChange={(e) => setTeamId(e.target.value)} style={styles.input}>
-                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                {allowedTeams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </label>
             <label style={styles.label}>

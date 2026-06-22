@@ -8,6 +8,7 @@ import TaskDetail from '../components/TaskDetail'
 import NewTaskModal from '../components/NewTaskModal'
 import RejectionBanner from '../components/RejectionBanner'
 import NotificationsPanel from '../components/NotificationsPanel'
+import { isMBM, isDirector, peopleVisibleForTeam, managedTeamIds } from '../lib/permissions'
 
 const MY_STATUS_FILTERS = [
   { key: 'all', label: 'All' },
@@ -127,6 +128,8 @@ export default function Dashboard() {
 
   useEffect(() => { loadAll() }, [teamFilter, employeeFilter])
 
+  const canViewTeamTasks = isMBM(profile) || isDirector(profile)
+  const managedTeams = managedTeamIds(profile)
   const activeTasks = view === 'mine' ? myTasks : teamTasks
 
   const filteredTasks = useMemo(() => {
@@ -176,10 +179,16 @@ export default function Dashboard() {
         <button onClick={() => { setView('mine'); setStatusFilter('all') }} style={{ ...styles.viewTab, ...(view === 'mine' ? styles.viewTabActive : {}) }}>
           My tasks
         </button>
-        <button onClick={() => { setView('team'); setStatusFilter('all') }} style={{ ...styles.viewTab, ...(view === 'team' ? styles.viewTabActive : {}) }}>
-          Team tasks
-        </button>
+        {canViewTeamTasks && (
+          <button onClick={() => { setView('team'); setStatusFilter('all') }} style={{ ...styles.viewTab, ...(view === 'team' ? styles.viewTabActive : {}) }}>
+            {isMBM(profile) ? 'All teams tasks' : 'My team tasks'}
+          </button>
+        )}
       </div>
+
+      {view === 'team' && !isMBM(profile) && managedTeams.length > 0 && (
+        <p style={styles.scopeNote}>Showing only teams you manage. Engineering and Operations can share the same director.</p>
+      )}
 
       <div style={styles.topBar}>
         <div style={styles.filters}>
@@ -202,7 +211,7 @@ export default function Dashboard() {
         <div style={styles.employeeFilterRow}>
           <select value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} style={styles.employeeSelect}>
             <option value="">All employees</option>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            {peopleVisibleForTeam(profile, people, teamFilter || null).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </select>
           {employeeFilter && (
             <button onClick={() => setEmployeeFilter('')} style={styles.clearEmployeeBtn}>Clear</button>
@@ -317,6 +326,7 @@ const styles = {
   viewTabRow: { display: 'flex', gap: 4, marginBottom: 18, background: 'var(--surface-2)', borderRadius: 999, padding: 4, width: 'fit-content' },
   viewTab: { fontSize: 13, fontWeight: 700, padding: '7px 18px', borderRadius: 999, border: 'none', background: 'none', color: 'var(--text-2)' },
   viewTabActive: { background: 'var(--surface)', color: 'var(--bupa-blue)', boxShadow: '0 1px 4px rgba(0,80,160,0.1)' },
+  scopeNote: { fontSize: 12.5, color: 'var(--text-3)', margin: '-8px 0 14px' },
   topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 16, flexWrap: 'wrap' },
   filters: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   filterBtn: {

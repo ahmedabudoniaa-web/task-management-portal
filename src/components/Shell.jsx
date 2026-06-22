@@ -2,9 +2,12 @@ import { useAuth } from '../lib/AuthContext'
 import { teamColor } from '../lib/teamColors'
 import { Link, useLocation } from 'react-router-dom'
 import HeaderSearch from './HeaderSearch'
+import { isMBM, managedTeamIds } from '../lib/permissions'
 
 export default function Shell({ children, teams, teamFilter, setTeamFilter, notifCount, onBellClick, progressPercent, searchSlot }) {
   const { profile, signOut } = useAuth()
+  const directorTeamIds = new Set(managedTeamIds(profile))
+  const visibleTeamTabs = isMBM(profile) ? teams : teams.filter((t) => directorTeamIds.has(t.id))
   const location = useLocation()
   const onPortfolio = location.pathname.startsWith('/portfolio')
   const onProjects = location.pathname.startsWith('/projects')
@@ -103,7 +106,7 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
             >
               <i className="ti ti-apps" style={{ fontSize: 14 }} aria-hidden="true" /> All teams
             </button>
-            {profile?.is_mbm && teams.map((t) => {
+            {visibleTeamTabs.length > 0 && visibleTeamTabs.map((t) => {
               const c = teamColor(t.name)
               const active = teamFilter === t.id
               return (

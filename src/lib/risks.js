@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { isMBM, managedTeamIds, profileTeamIds } from './permissions'
 import { logAudit } from './governance'
 
 // ---------- RISKS ----------
@@ -14,8 +15,14 @@ export async function fetchRisks({ profile, teamFilter, projectId }) {
     `)
     .order('created_at', { ascending: false })
 
-  if (!profile.is_mbm) {
-    query = query.or(`team_id.eq.${profile.team_id},owner_id.eq.${profile.id},created_by.eq.${profile.id}`)
+  if (!isMBM(profile)) {
+    const directorTeams = managedTeamIds(profile)
+    if (directorTeams.length > 0) query = query.in('team_id', directorTeams)
+    else {
+      const teams = profileTeamIds(profile)
+      if (teams.length > 1) query = query.in('team_id', teams)
+      else query = query.or(`team_id.eq.${profile.team_id},owner_id.eq.${profile.id},created_by.eq.${profile.id}`)
+    }
   }
   if (teamFilter) query = query.eq('team_id', teamFilter)
   if (projectId) query = query.eq('project_id', projectId)
@@ -69,8 +76,14 @@ export async function fetchIssues({ profile, teamFilter, projectId }) {
     `)
     .order('date_raised', { ascending: false })
 
-  if (!profile.is_mbm) {
-    query = query.or(`team_id.eq.${profile.team_id},owner_id.eq.${profile.id},created_by.eq.${profile.id}`)
+  if (!isMBM(profile)) {
+    const directorTeams = managedTeamIds(profile)
+    if (directorTeams.length > 0) query = query.in('team_id', directorTeams)
+    else {
+      const teams = profileTeamIds(profile)
+      if (teams.length > 1) query = query.in('team_id', teams)
+      else query = query.or(`team_id.eq.${profile.team_id},owner_id.eq.${profile.id},created_by.eq.${profile.id}`)
+    }
   }
   if (teamFilter) query = query.eq('team_id', teamFilter)
   if (projectId) query = query.eq('project_id', projectId)
@@ -122,8 +135,14 @@ export async function fetchDecisions({ profile, teamFilter, projectId }) {
     `)
     .order('decision_date', { ascending: false })
 
-  if (!profile.is_mbm) {
-    query = query.or(`team_id.eq.${profile.team_id},decision_owner_id.eq.${profile.id},created_by.eq.${profile.id}`)
+  if (!isMBM(profile)) {
+    const directorTeams = managedTeamIds(profile)
+    if (directorTeams.length > 0) query = query.in('team_id', directorTeams)
+    else {
+      const teams = profileTeamIds(profile)
+      if (teams.length > 1) query = query.in('team_id', teams)
+      else query = query.or(`team_id.eq.${profile.team_id},decision_owner_id.eq.${profile.id},created_by.eq.${profile.id}`)
+    }
   }
   if (teamFilter) query = query.eq('team_id', teamFilter)
   if (projectId) query = query.eq('project_id', projectId)
