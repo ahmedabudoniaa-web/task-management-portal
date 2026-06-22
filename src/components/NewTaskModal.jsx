@@ -8,15 +8,15 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
   const [description, setDescription] = useState('')
   const [teamId, setTeamId] = useState(profile.team_id)
   const [projectId, setProjectId] = useState('')
-  const [assigneeId, setAssigneeId] = useState('')
+  const [assigneeId, setAssigneeId] = useState(profile.id)
   const [targetDate, setTargetDate] = useState('')
   const [priority, setPriority] = useState('medium')
-  const [subActions, setSubActions] = useState([])
+  const [subActions, setSubActions] = useState([{ name: '', description: '', deadline: '', assigneeId: profile.id }])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
   function addSubActionRow() {
-    setSubActions((rows) => [...rows, { name: '', description: '', deadline: '', assigneeId: '' }])
+    setSubActions((rows) => [...rows, { name: '', description: '', deadline: '', assigneeId: assigneeId || profile.id }])
   }
 
   function updateSubActionRow(index, field, value) {
@@ -24,7 +24,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
   }
 
   function removeSubActionRow(index) {
-    setSubActions((rows) => rows.filter((_, i) => i !== index))
+    setSubActions((rows) => rows.length === 1 ? [{ name: '', description: '', deadline: '', assigneeId: assigneeId || profile.id }] : rows.filter((_, i) => i !== index))
   }
 
   async function handleSubmit(e) {
@@ -41,7 +41,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
         assigneeId: assigneeId || null,
         targetDate,
         priority,
-        subActions,
+        subActions: subActions.filter((s) => s.name.trim()),
       })
       onCreated()
     } catch (err) {
@@ -57,34 +57,33 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
-          <h2 style={styles.title}>New task</h2>
-          <button onClick={onClose} style={styles.closeBtn} aria-label="Close">
-            <i className="ti ti-x" style={{ fontSize: 16 }} aria-hidden="true" />
-          </button>
+          <div>
+            <p style={styles.eyebrow}>Task creation</p>
+            <h2 style={styles.title}>New task</h2>
+          </div>
+          <button onClick={onClose} style={styles.closeBtn} aria-label="Close">×</button>
         </div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>
-            Task name
+          <label style={styles.labelWide}>
+            Task name <span style={styles.required}>*</span>
             <input value={name} onChange={(e) => setName(e.target.value)} required style={styles.input} placeholder="Renew vendor contract" />
           </label>
 
-          <label style={styles.label}>
+          <label style={styles.labelWide}>
             Description / first action
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} style={styles.textarea} placeholder="What needs to happen" />
           </label>
 
-          <div style={styles.row}>
+          <div style={styles.grid2}>
             <label style={styles.label}>
-              Team
+              Team <span style={styles.required}>*</span>
               <select value={teamId} onChange={(e) => setTeamId(e.target.value)} style={styles.input}>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
+                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </label>
             <label style={styles.label}>
-              Priority
+              Priority <span style={styles.required}>*</span>
               <select value={priority} onChange={(e) => setPriority(e.target.value)} style={styles.input}>
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -95,7 +94,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
           </div>
 
           {projects && projects.length > 0 && (
-            <label style={styles.label}>
+            <label style={styles.labelWide}>
               Link to project (optional)
               <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={styles.input}>
                 <option value="">No project</option>
@@ -104,7 +103,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
             </label>
           )}
 
-          <div style={styles.row}>
+          <div style={styles.grid2}>
             <label style={styles.label}>
               Assign to
               <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} style={styles.input}>
@@ -123,56 +122,60 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
 
           <div style={styles.subSection}>
             <div style={styles.subSectionHeader}>
-              <p style={styles.subSectionLabel}>Sub-actions (optional)</p>
-              <button type="button" onClick={addSubActionRow} style={styles.addLink}>
-                <i className="ti ti-plus" style={{ fontSize: 13 }} aria-hidden="true" /> Add
-              </button>
+              <div>
+                <p style={styles.subSectionLabel}>Sub-actions</p>
+                <p style={styles.subHint}>Break the task into smaller visible steps.</p>
+              </div>
+              <button type="button" onClick={addSubActionRow} style={styles.addBtn}>+ Add sub-action</button>
             </div>
+
             {subActions.map((row, i) => (
               <div key={i} style={styles.subActionRow}>
-                <div style={styles.subActionRowTop}>
+                <div style={styles.subActionHeader}>
+                  <span style={styles.subIndex}>{i + 1}</span>
                   <input
-                    value={row.name} onChange={(e) => updateSubActionRow(i, 'name', e.target.value)}
-                    placeholder="Sub-action name" style={{ ...styles.input, flex: 1 }}
+                    value={row.name}
+                    onChange={(e) => updateSubActionRow(i, 'name', e.target.value)}
+                    placeholder="Sub-action name"
+                    style={{ ...styles.input, flex: 1 }}
                   />
-                  <button type="button" onClick={() => removeSubActionRow(i)} style={styles.removeRowBtn} aria-label="Remove">
-                    <i className="ti ti-x" style={{ fontSize: 14 }} aria-hidden="true" />
-                  </button>
+                  <button type="button" onClick={() => removeSubActionRow(i)} style={styles.removeRowBtn}>Remove</button>
                 </div>
-                <input
-                  value={row.description} onChange={(e) => updateSubActionRow(i, 'description', e.target.value)}
-                  placeholder="Description (optional)" style={{ ...styles.input, marginTop: 6 }}
-                />
-                <div style={{ ...styles.row, marginTop: 6 }}>
+                <div style={styles.grid2Compact}>
                   <input
-                    type="date" value={row.deadline} onChange={(e) => updateSubActionRow(i, 'deadline', e.target.value)}
+                    value={row.description}
+                    onChange={(e) => updateSubActionRow(i, 'description', e.target.value)}
+                    placeholder="Description (optional)"
                     style={styles.input}
                   />
-                  <select
-                    value={row.assigneeId} onChange={(e) => updateSubActionRow(i, 'assigneeId', e.target.value)}
+                  <input
+                    type="date"
+                    value={row.deadline}
+                    onChange={(e) => updateSubActionRow(i, 'deadline', e.target.value)}
                     style={styles.input}
-                  >
-                    <option value="">Unassigned</option>
-                    {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                  </select>
+                  />
                 </div>
+                <select
+                  value={row.assigneeId}
+                  onChange={(e) => updateSubActionRow(i, 'assigneeId', e.target.value)}
+                  style={{ ...styles.input, marginTop: 8 }}
+                >
+                  <option value="">Sub-action unassigned</option>
+                  {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                </select>
               </div>
             ))}
           </div>
 
-          <p style={styles.hint}>
-            {assigneeId && assigneeId !== profile.id
-              ? 'They will need to accept this task before it moves to in progress.'
-              : 'You can add more sub-actions and collaborators after creating the task too.'}
-          </p>
-
-          {error && <p style={styles.error}>{error}</p>}
-
-          <div style={styles.actions}>
-            <button type="button" onClick={onClose} disabled={saving} style={styles.secondaryBtn}>Cancel</button>
-            <button type="submit" disabled={saving} style={styles.primaryBtn}>
-              {saving ? 'Creating…' : 'Create task'}
-            </button>
+          <div style={styles.footer}>
+            <div>
+              {error && <p style={styles.error}>{error}</p>}
+              <p style={styles.hint}>{assigneeId && assigneeId !== profile.id ? 'The assignee will need to accept this task.' : 'Only filled sub-actions will be created.'}</p>
+            </div>
+            <div style={styles.actions}>
+              <button type="button" onClick={onClose} disabled={saving} style={styles.secondaryBtn}>Cancel</button>
+              <button type="submit" disabled={saving} style={styles.primaryBtn}>{saving ? 'Creating…' : 'Create task'}</button>
+            </div>
           </div>
         </form>
       </div>
@@ -181,32 +184,33 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
 }
 
 const styles = {
-  overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 100,
-  },
-  modal: {
-    background: 'var(--surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 560,
-    maxHeight: '88vh', overflowY: 'auto', overflowX: 'hidden', padding: '22px 24px', boxSizing: 'border-box',
-  },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
-  title: { fontSize: 18, fontWeight: 700, margin: 0 },
-  closeBtn: { background: 'none', border: 'none', color: 'var(--text-2)', flexShrink: 0 },
-  form: { display: 'flex', flexDirection: 'column', gap: 14 },
-  row: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  label: { fontSize: 13, fontWeight: 600, color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 200px', minWidth: 0 },
-  input: { fontSize: 14, padding: '9px 11px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', width: '100%', boxSizing: 'border-box' },
-  textarea: { fontSize: 14, padding: '9px 11px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', minHeight: 64, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' },
-  subSection: { background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: 12 },
-  subSectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  subSectionLabel: { fontSize: 12, fontWeight: 700, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.03em', margin: 0 },
-  addLink: { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: 'var(--bupa-blue)', fontSize: 12, fontWeight: 700 },
-  subActionRow: { background: '#fff', borderRadius: 'var(--radius)', padding: 10, marginBottom: 8 },
-  subActionRowTop: { display: 'flex', gap: 8, alignItems: 'center' },
-  removeRowBtn: { background: 'none', border: 'none', color: 'var(--text-3)', flexShrink: 0 },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(8,18,32,0.42)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18, zIndex: 100 },
+  modal: { background: 'var(--surface)', borderRadius: 18, width: '100%', maxWidth: 760, maxHeight: '92vh', overflowY: 'auto', overflowX: 'hidden', padding: '20px 22px', boxSizing: 'border-box', boxShadow: '0 22px 60px rgba(0,0,0,0.16)' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12 },
+  eyebrow: { fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px', fontWeight: 800 },
+  title: { fontSize: 22, fontWeight: 800, margin: 0 },
+  closeBtn: { width: 34, height: 34, borderRadius: 10, border: '1px solid var(--border)', background: '#fff', color: 'var(--text-2)', fontSize: 22, lineHeight: 1, cursor: 'pointer' },
+  form: { display: 'flex', flexDirection: 'column', gap: 12 },
+  grid2: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 },
+  grid2Compact: { display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 8, marginTop: 8 },
+  label: { fontSize: 12.5, fontWeight: 750, color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 },
+  labelWide: { fontSize: 12.5, fontWeight: 750, color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: 6 },
+  required: { color: 'var(--danger)' },
+  input: { fontSize: 14, padding: '10px 12px', borderRadius: 12, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', width: '100%', boxSizing: 'border-box', minHeight: 42 },
+  textarea: { fontSize: 14, padding: '10px 12px', borderRadius: 12, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', minHeight: 76, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' },
+  subSection: { background: 'var(--surface-2)', borderRadius: 16, padding: 12, border: '1px solid var(--border)' },
+  subSectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 10 },
+  subSectionLabel: { fontSize: 13, fontWeight: 800, color: 'var(--text)', margin: 0 },
+  subHint: { fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' },
+  addBtn: { border: 'none', background: 'var(--bupa-blue)', color: '#fff', padding: '8px 12px', borderRadius: 10, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' },
+  subActionRow: { background: '#fff', borderRadius: 14, padding: 10, marginBottom: 8, border: '1px solid var(--border)' },
+  subActionHeader: { display: 'flex', alignItems: 'center', gap: 8 },
+  subIndex: { width: 24, height: 24, borderRadius: 999, background: 'var(--info-light)', color: 'var(--info)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 },
+  removeRowBtn: { border: '1px solid var(--border)', background: '#fff', color: 'var(--text-2)', borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  footer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, paddingTop: 2 },
   hint: { fontSize: 12, color: 'var(--text-3)', margin: 0 },
-  error: { fontSize: 12.5, color: 'var(--danger)', margin: 0, fontWeight: 600 },
-  actions: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 },
-  secondaryBtn: { padding: '9px 16px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'none', color: 'var(--text)', fontSize: 13, fontWeight: 600 },
-  primaryBtn: { padding: '9px 18px', borderRadius: 'var(--radius)', border: 'none', background: 'linear-gradient(135deg, #0050A0, #2D8FE0)', color: '#fff', fontSize: 13, fontWeight: 700 },
+  error: { fontSize: 12.5, color: 'var(--danger)', margin: '0 0 4px', fontWeight: 700 },
+  actions: { display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 },
+  secondaryBtn: { padding: '10px 16px', borderRadius: 12, border: '1px solid var(--border)', background: '#fff', color: 'var(--text)', fontSize: 13, fontWeight: 750, cursor: 'pointer' },
+  primaryBtn: { padding: '10px 18px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #0050A0, #2D8FE0)', color: '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' },
 }
