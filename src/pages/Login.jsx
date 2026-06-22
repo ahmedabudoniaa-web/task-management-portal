@@ -20,59 +20,47 @@ export default function Login() {
   return (
     <div style={styles.page}>
       <style>{`
-        @keyframes dash { to { stroke-dashoffset: -400; } }
-        @keyframes glowPulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
-        @keyframes floatGrid { from { background-position: 0 0; } to { background-position: 60px 60px; } }
         .login-card { animation: fadeIn 0.5s ease both; }
-        .pulse-line { animation: dash 3.5s linear infinite; }
-        .login-input:focus { outline: none; border-color: var(--border-strong) !important; box-shadow: 0 0 0 3px var(--pulse-dim); }
-        .login-btn:hover { box-shadow: 0 0 28px var(--pulse-dim), 0 0 0 1px var(--border-strong); transform: translateY(-1px); }
-        .bg-grid {
-          position: fixed; inset: 0; z-index: 0; pointer-events: none;
-          background-image: linear-gradient(rgba(0,229,199,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,229,199,0.05) 1px, transparent 1px);
-          background-size: 60px 60px;
-          animation: floatGrid 6s linear infinite;
-          mask-image: radial-gradient(circle at 50% 30%, black, transparent 70%);
-        }
+        .login-input:focus { outline: none; border-color: var(--bupa-blue) !important; box-shadow: 0 0 0 3px rgba(0,80,160,0.12); }
+        .login-btn:hover { box-shadow: 0 6px 18px rgba(0,80,160,0.25); transform: translateY(-1px); }
+        .login-blob { position: absolute; border-radius: 50%; opacity: 0.12; background: white; }
       `}</style>
-      <div className="bg-grid" aria-hidden="true" />
 
       <div className="login-card" style={styles.card}>
-        <svg width="100%" height="36" viewBox="0 0 360 36" style={{ marginBottom: 18 }} aria-hidden="true">
-          <polyline
-            className="pulse-line"
-            points="0,18 60,18 75,4 90,32 105,18 150,18 165,10 180,26 195,18 360,18"
-            fill="none" stroke="var(--pulse)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            strokeDasharray="6 4"
-          />
-        </svg>
+        <div style={styles.banner}>
+          <div className="login-blob" style={{ width: 110, height: 110, top: -40, right: -10 }} />
+          <div className="login-blob" style={{ width: 60, height: 60, bottom: -30, left: 30 }} />
+          <img src="/logo.png" alt="FM Task Management" style={styles.logo} />
+        </div>
 
-        <p style={styles.eyebrow}>Bupa Arabia &middot; internal portal</p>
-        <h1 style={styles.title}>Task control center</h1>
-        <p style={styles.subtitle}>Sign in with the credentials your admin set up for you.</p>
+        <div style={styles.body}>
+          <p style={styles.eyebrow}>FM task management</p>
+          <h1 style={styles.title}>Welcome back</h1>
+          <p style={styles.subtitle}>Sign in with the credentials your admin set up for you.</p>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <label style={styles.label}>
-            Email
-            <input
-              type="email" className="login-input" value={email}
-              onChange={(e) => setEmail(e.target.value)} required
-              style={styles.input} placeholder="you@bupa.com.sa"
-            />
-          </label>
-          <label style={styles.label}>
-            Password
-            <input
-              type="password" className="login-input" value={password}
-              onChange={(e) => setPassword(e.target.value)} required
-              style={styles.input} placeholder="••••••••"
-            />
-          </label>
-          {error && <p style={styles.error}>{error}</p>}
-          <button type="submit" disabled={loading} className="login-btn" style={styles.button}>
-            {loading ? 'Authenticating…' : 'Enter portal'}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} style={styles.form}>
+            <label style={styles.label}>
+              Email
+              <input
+                type="email" className="login-input" value={email}
+                onChange={(e) => setEmail(e.target.value)} required
+                style={styles.input} placeholder="you@company.com"
+              />
+            </label>
+            <label style={styles.label}>
+              Password
+              <input
+                type="password" className="login-input" value={password}
+                onChange={(e) => setPassword(e.target.value)} required
+                style={styles.input} placeholder="••••••••"
+              />
+            </label>
+            {error && <p style={styles.error}>{error}</p>}
+            <button type="submit" disabled={loading} className="login-btn" style={styles.button}>
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )
@@ -81,34 +69,36 @@ export default function Login() {
 const styles = {
   page: {
     minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: 24, position: 'relative', overflow: 'hidden',
+    padding: 24, background: 'var(--bg)',
   },
   card: {
-    width: '100%', maxWidth: 400, background: 'var(--surface)', backdropFilter: 'blur(20px)',
-    borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', padding: '40px 36px',
-    position: 'relative', zIndex: 1, boxShadow: '0 0 60px rgba(0, 229, 199, 0.06), 0 20px 60px rgba(0,0,0,0.4)',
+    width: '100%', maxWidth: 400, background: 'var(--surface)',
+    borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+    boxShadow: '0 4px 24px rgba(0,80,160,0.08)',
   },
+  banner: {
+    background: 'linear-gradient(135deg, #0050A0, #2D8FE0)', padding: '28px 0',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    position: 'relative', overflow: 'hidden',
+  },
+  logo: { width: 64, height: 64, borderRadius: 16, position: 'relative', zIndex: 1, objectFit: 'cover' },
+  body: { padding: '32px 36px 36px' },
   eyebrow: {
-    fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--pulse)',
-    margin: '0 0 10px', fontWeight: 600, fontFamily: 'var(--font-display)',
+    fontSize: 11.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--bupa-blue)',
+    margin: '0 0 8px', fontWeight: 700,
   },
-  title: {
-    fontSize: 26, fontWeight: 600, margin: '0 0 8px', fontFamily: 'var(--font-display)',
-    background: 'linear-gradient(135deg, #EAF2FF 0%, #00E5C7 120%)',
-    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-  },
-  subtitle: { fontSize: 13.5, color: 'var(--text-2)', margin: '0 0 30px', lineHeight: 1.6 },
-  form: { display: 'flex', flexDirection: 'column', gap: 18 },
-  label: { fontSize: 12.5, fontWeight: 500, color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: 7, letterSpacing: '0.01em' },
+  title: { fontSize: 24, fontWeight: 800, margin: '0 0 8px', color: 'var(--text)' },
+  subtitle: { fontSize: 13.5, color: 'var(--text-2)', margin: '0 0 26px', lineHeight: 1.6 },
+  form: { display: 'flex', flexDirection: 'column', gap: 16 },
+  label: { fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: 6 },
   input: {
-    fontSize: 14, padding: '12px 14px', borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-    background: 'rgba(6, 9, 18, 0.5)', color: 'var(--text)', transition: 'all 0.2s',
+    fontSize: 14, padding: '11px 13px', borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+    background: '#fff', color: 'var(--text)', transition: 'all 0.15s',
   },
   error: { fontSize: 12.5, color: 'var(--danger)', margin: 0 },
   button: {
-    marginTop: 6, padding: '13px 0', borderRadius: 'var(--radius)', border: '1px solid var(--border-strong)',
-    background: 'linear-gradient(135deg, rgba(0,229,199,0.18), rgba(61,169,252,0.12))',
-    color: 'var(--text)', fontSize: 14, fontWeight: 600, letterSpacing: '0.02em',
-    transition: 'all 0.25s', fontFamily: 'var(--font-display)',
+    marginTop: 4, padding: '12px 0', borderRadius: 'var(--radius)', border: 'none',
+    background: 'linear-gradient(135deg, #0050A0, #2D8FE0)',
+    color: '#fff', fontSize: 14, fontWeight: 700, transition: 'all 0.2s',
   },
 }

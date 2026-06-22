@@ -1,71 +1,83 @@
 import { useAuth } from '../lib/AuthContext'
+import { teamColor } from '../lib/teamColors'
 
-export default function Shell({ children, teams, teamFilter, setTeamFilter, notifCount, onBellClick }) {
+export default function Shell({ children, teams, teamFilter, setTeamFilter, notifCount, onBellClick, progressPercent }) {
   const { profile, signOut } = useAuth()
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <style>{`
-        @keyframes dashHeader { to { stroke-dashoffset: -300; } }
-        @keyframes ringPing { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.2); opacity: 0; } }
-        .shell-header { animation: fadeIn 0.4s ease both; }
-        .pulse-bar { animation: dashHeader 4s linear infinite; }
-        .bell-btn { position: relative; transition: color 0.2s; }
-        .bell-btn:hover { color: var(--pulse) !important; }
-        .bell-ring { position: absolute; inset: -2px; border-radius: 50%; border: 1px solid var(--pulse); animation: ringPing 1.8s ease-out infinite; }
-        .team-select:focus { outline: none; border-color: var(--border-strong) !important; }
-        .signout-btn:hover { border-color: var(--border-strong) !important; color: var(--pulse) !important; }
+        .shell-blob { position: absolute; border-radius: 50%; opacity: 0.13; background: white; }
+        .shell-tab { transition: all 0.15s; }
+        .shell-tab:hover { transform: translateY(-1px); }
+        .bell-btn { position: relative; transition: opacity 0.2s; }
+        .bell-btn:hover { opacity: 0.75; }
+        .signout-btn { transition: all 0.15s; }
+        .signout-btn:hover { background: var(--surface-2) !important; }
+        .header-card { animation: fadeIn 0.35s ease both; }
       `}</style>
-      <header className="shell-header" style={styles.header}>
-        <svg width="100%" height="2" viewBox="0 0 1100 2" preserveAspectRatio="none" style={styles.pulseSvg} aria-hidden="true">
-          <line className="pulse-bar" x1="0" y1="1" x2="1100" y2="1" stroke="var(--pulse)" strokeWidth="2" strokeDasharray="40 200" opacity="0.7" />
-        </svg>
-        <div style={styles.headerInner}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-            <div style={styles.logoWrap}>
-              <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
-                <polyline points="0,12 6,12 9,4 13,20 17,12 24,12" fill="none" stroke="var(--pulse)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <p style={styles.logo}>Task control</p>
-            </div>
-            {profile?.is_mbm && (
-              <select
-                value={teamFilter || ''}
-                onChange={(e) => setTeamFilter(e.target.value || null)}
-                className="team-select"
-                style={styles.teamSelect}
-              >
-                <option value="">All teams</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            )}
-          </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-            <button onClick={onBellClick} className="bell-btn" style={styles.bellButton} aria-label="Notifications">
-              <i className="ti ti-bell" style={{ fontSize: 18 }} aria-hidden="true" />
-              {notifCount > 0 && (
-                <>
-                  <span className="bell-ring" aria-hidden="true" />
-                  <span style={styles.bellDot}>{notifCount}</span>
-                </>
+      <header className="header-card" style={styles.header}>
+        <div className="shell-blob" style={{ width: 130, height: 130, top: -45, right: 40 }} />
+        <div className="shell-blob" style={{ width: 60, height: 60, bottom: -30, left: 200 }} />
+        <div style={styles.headerInner}>
+          <div style={styles.topRow}>
+            <div style={styles.brandRow}>
+              <img src="/logo.png" alt="FM Task Management" style={styles.logo} />
+              <div>
+                <p style={styles.brandName}>FM Task Management</p>
+                <p style={styles.greeting}>Hey {profile?.full_name?.split(' ')[0]}, here's today</p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <button onClick={onBellClick} className="bell-btn" style={styles.bellButton} aria-label="Notifications">
+                <i className="ti ti-bell" style={{ fontSize: 18, color: '#fff' }} aria-hidden="true" />
+                {notifCount > 0 && <span style={styles.bellDot}>{notifCount}</span>}
+              </button>
+              {typeof progressPercent === 'number' && (
+                <div style={styles.ringWrap}>
+                  <svg width="42" height="42" viewBox="0 0 40 40">
+                    <circle cx="20" cy="20" r="17" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="5" />
+                    <circle
+                      cx="20" cy="20" r="17" fill="none" stroke="#fff" strokeWidth="5"
+                      strokeDasharray={`${Math.round(progressPercent * 1.07)} 107`}
+                      strokeLinecap="round" transform="rotate(-90 20 20)"
+                    />
+                  </svg>
+                  <span style={styles.ringLabel}>{Math.round(progressPercent)}%</span>
+                </div>
               )}
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
               <div style={styles.avatar}>
                 {profile?.full_name?.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
               </div>
-              <div>
-                <p style={styles.name}>
-                  {profile?.full_name}
-                  {profile?.is_mbm && <span style={styles.mbmTag}>MBM</span>}
-                </p>
-                <p style={styles.team}>{profile?.team?.name}</p>
-              </div>
+              <button onClick={signOut} className="signout-btn" style={styles.signOut}>Sign out</button>
             </div>
-            <button onClick={signOut} className="signout-btn" style={styles.signOut}>Sign out</button>
+          </div>
+
+          <div style={styles.tabRow}>
+            <button
+              onClick={() => setTeamFilter(null)}
+              className="shell-tab"
+              style={{ ...styles.tab, ...(!teamFilter ? styles.tabActive : {}) }}
+            >
+              <i className="ti ti-apps" style={{ fontSize: 14 }} aria-hidden="true" /> All teams
+            </button>
+            {profile?.is_mbm && teams.map((t) => {
+              const c = teamColor(t.name)
+              const active = teamFilter === t.id
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTeamFilter(t.id)}
+                  className="shell-tab"
+                  style={{ ...styles.tab, ...(active ? styles.tabActive : {}) }}
+                >
+                  <span style={{ ...styles.tabDot, background: active ? 'var(--bupa-blue)' : c.dot }} />
+                  {t.name}
+                </button>
+              )
+            })}
           </div>
         </div>
       </header>
@@ -76,40 +88,42 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
 
 const styles = {
   header: {
-    background: 'var(--surface)', backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 10,
+    background: 'linear-gradient(135deg, #0050A0, #2D8FE0)',
+    position: 'relative', overflow: 'hidden',
   },
-  pulseSvg: { display: 'block', position: 'absolute', top: 0, left: 0 },
-  headerInner: {
-    maxWidth: 1100, margin: '0 auto', padding: '16px 24px',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  },
-  logoWrap: { display: 'flex', alignItems: 'center', gap: 9 },
-  logo: { fontSize: 15, fontWeight: 600, margin: 0, letterSpacing: '-0.01em', fontFamily: 'var(--font-display)' },
-  teamSelect: {
-    fontSize: 13, padding: '7px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)',
-    background: 'rgba(6,9,18,0.5)', color: 'var(--text)', transition: 'border-color 0.2s',
-  },
-  bellButton: { position: 'relative', background: 'none', border: 'none', color: 'var(--text-2)', padding: 6, transition: 'color 0.2s' },
+  headerInner: { maxWidth: 1100, margin: '0 auto', padding: '20px 24px 18px', position: 'relative' },
+  topRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  brandRow: { display: 'flex', alignItems: 'center', gap: 12 },
+  logo: { width: 36, height: 36, borderRadius: 11, objectFit: 'cover' },
+  brandName: { margin: 0, color: '#fff', fontSize: 15.5, fontWeight: 700 },
+  greeting: { margin: '1px 0 0', color: 'rgba(255,255,255,0.78)', fontSize: 11.5 },
+  bellButton: { position: 'relative', background: 'none', border: 'none', padding: 4 },
   bellDot: {
-    position: 'absolute', top: -2, right: -2, background: 'var(--danger)', color: '#fff',
+    position: 'absolute', top: -3, right: -4, background: '#FF5C72', color: '#fff',
     fontSize: 10, fontWeight: 700, borderRadius: 999, minWidth: 16, height: 16,
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
+    border: '1.5px solid #0050A0',
+  },
+  ringWrap: { position: 'relative', width: 42, height: 42 },
+  ringLabel: {
+    position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 11, fontWeight: 800, color: '#fff',
   },
   avatar: {
-    width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(0,229,199,0.25), rgba(61,169,252,0.2))',
-    border: '1px solid var(--border-strong)', color: 'var(--pulse)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
+    width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.22)',
+    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
   },
-  name: { fontSize: 13, fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 6 },
-  mbmTag: {
-    fontSize: 10, fontWeight: 700, background: 'var(--pulse)', color: '#04342C',
-    padding: '1px 6px', borderRadius: 4, letterSpacing: '0.02em',
-  },
-  team: { fontSize: 12, color: 'var(--text-3)', margin: 0 },
   signOut: {
-    fontSize: 13, color: 'var(--text-2)', background: 'none', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius)', padding: '7px 14px', transition: 'all 0.2s',
+    fontSize: 12.5, color: '#fff', background: 'rgba(255,255,255,0.15)', border: 'none',
+    borderRadius: 'var(--radius)', padding: '7px 14px', fontWeight: 600,
   },
-  main: { maxWidth: 1100, margin: '0 auto', padding: '28px 24px 60px' },
+  tabRow: { display: 'flex', gap: 8, flexWrap: 'wrap', position: 'relative' },
+  tab: {
+    padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700,
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none',
+  },
+  tabActive: { background: '#fff', color: 'var(--bupa-blue)' },
+  tabDot: { width: 7, height: 7, borderRadius: '50%', display: 'inline-block' },
+  main: { maxWidth: 1100, margin: '0 auto', padding: '24px 24px 60px' },
 }

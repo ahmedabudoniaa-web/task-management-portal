@@ -62,6 +62,12 @@ export default function Dashboard() {
 
   const unreadCount = notifications.filter((n) => !n.is_read).length
 
+  const progressPercent = useMemo(() => {
+    if (tasks.length === 0) return 0
+    const done = tasks.filter((t) => t.status === 'done').length
+    return (done / tasks.length) * 100
+  }, [tasks])
+
   return (
     <Shell
       teams={teams}
@@ -69,6 +75,7 @@ export default function Dashboard() {
       setTeamFilter={setTeamFilter}
       notifCount={unreadCount}
       onBellClick={() => setShowNotifs((s) => !s)}
+      progressPercent={progressPercent}
     >
       <RejectionBanner tasks={rejectedForMe} onDismiss={() => {}} />
 
@@ -142,20 +149,18 @@ const styles = {
   filters: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   filterBtn: {
     fontSize: 13, padding: '6px 14px', borderRadius: 999, border: '1px solid var(--border)',
-    background: 'var(--surface)', color: 'var(--text-2)', transition: 'all 0.2s',
+    background: 'var(--surface)', color: 'var(--text-2)', transition: 'all 0.15s', fontWeight: 600,
   },
   filterBtnActive: {
-    background: 'linear-gradient(135deg, rgba(0,229,199,0.22), rgba(61,169,252,0.15))',
-    color: 'var(--pulse)', borderColor: 'var(--border-strong)',
-    boxShadow: '0 0 16px var(--pulse-dim)',
+    background: 'var(--bupa-blue)', color: '#fff', borderColor: 'var(--bupa-blue)',
   },
   newBtn: {
-    display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '9px 18px',
-    borderRadius: 'var(--radius)', border: '1px solid var(--border-strong)',
-    background: 'linear-gradient(135deg, rgba(0,229,199,0.2), rgba(61,169,252,0.12))',
-    color: 'var(--text)', flexShrink: 0, transition: 'all 0.2s', fontFamily: 'var(--font-display)',
+    display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, padding: '9px 18px',
+    borderRadius: 'var(--radius)', border: 'none',
+    background: 'linear-gradient(135deg, #0050A0, #2D8FE0)',
+    color: '#fff', flexShrink: 0, transition: 'all 0.2s', boxShadow: '0 2px 8px rgba(0,80,160,0.2)',
   },
   emptyState: { textAlign: 'center', padding: '60px 0', color: 'var(--text-3)' },
-  emptyTitle: { fontSize: 15, fontWeight: 600, color: 'var(--text-2)', margin: '0 0 4px' },
+  emptyTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text-2)', margin: '0 0 4px' },
   emptySub: { fontSize: 13, margin: 0 },
 }

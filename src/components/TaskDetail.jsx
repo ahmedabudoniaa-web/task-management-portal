@@ -10,6 +10,7 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
   const { profile } = useAuth()
   const [task, setTask] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [noteBody, setNoteBody] = useState('')
   const [editingNoteId, setEditingNoteId] = useState(null)
   const [editingBody, setEditingBody] = useState('')
@@ -23,9 +24,15 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
 
   async function load() {
     setLoading(true)
-    const data = await fetchTaskDetail(taskId)
-    setTask(data)
-    setLoading(false)
+    setLoadError(null)
+    try {
+      const data = await fetchTaskDetail(taskId)
+      setTask(data)
+    } catch (err) {
+      setLoadError(err.message || 'Could not load this task.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [taskId])
@@ -33,6 +40,23 @@ export default function TaskDetail({ taskId, people, onClose, onChanged }) {
   async function refresh() {
     await load()
     onChanged?.()
+  }
+
+  if (loadError) {
+    return (
+      <div style={styles.overlay}>
+        <div style={styles.panel}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={onClose} style={styles.closeBtn} aria-label="Close">
+              <i className="ti ti-x" style={{ fontSize: 18 }} aria-hidden="true" />
+            </button>
+          </div>
+          <p style={{ color: 'var(--danger)', fontSize: 14, fontWeight: 600 }}>Couldn't load this task</p>
+          <p style={{ color: 'var(--text-2)', fontSize: 13 }}>{loadError}</p>
+          <button onClick={load} style={styles.smallBtn}>Try again</button>
+        </div>
+      </div>
+    )
   }
 
   if (loading || !task) {

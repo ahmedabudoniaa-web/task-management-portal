@@ -37,7 +37,7 @@ export async function fetchTaskDetail(taskId) {
       team:teams(id, name),
       owner:profiles!tasks_owner_id_fkey(id, full_name),
       assignee:profiles!tasks_assignee_id_fkey(id, full_name),
-      sub_actions(*, assignee:profiles(id, full_name)),
+      sub_actions(*, assignee:profiles!sub_actions_assignee_id_fkey(id, full_name)),
       notes(*, author:profiles(id, full_name)),
       change_log(*, actor:profiles(id, full_name)),
       date_change_requests(*, requester:profiles!date_change_requests_requested_by_fkey(id, full_name))
