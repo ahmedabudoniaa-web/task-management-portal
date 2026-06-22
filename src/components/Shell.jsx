@@ -1,6 +1,7 @@
 import { useAuth } from '../lib/AuthContext'
 import { teamColor } from '../lib/teamColors'
 import { Link, useLocation } from 'react-router-dom'
+import HeaderSearch from './HeaderSearch'
 
 export default function Shell({ children, teams, teamFilter, setTeamFilter, notifCount, onBellClick, progressPercent, searchSlot }) {
   const { profile, signOut } = useAuth()
@@ -9,6 +10,8 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
   const onProjects = location.pathname.startsWith('/projects')
   const onActions = location.pathname.startsWith('/actions')
   const onGovernance = location.pathname.startsWith('/governance')
+  const onInbox = location.pathname.startsWith('/inbox')
+  const onProfile = location.pathname.startsWith('/profile')
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -53,10 +56,16 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
                 <Link to="/governance" className="nav-link" style={{ ...styles.navLink, ...(onGovernance ? styles.navLinkActive : {}) }}>
                   Governance
                 </Link>
+                <Link to="/inbox" className="nav-link" style={{ ...styles.navLink, ...(onInbox ? styles.navLinkActive : {}) }}>
+                  Inbox
+                </Link>
+                <Link to="/profile" className="nav-link" style={{ ...styles.navLink, ...(onProfile ? styles.navLinkActive : {}) }}>
+                  Profile
+                </Link>
               </div>
             </div>
 
-            {searchSlot && <div style={styles.searchSlotWrap}>{searchSlot}</div>}
+            <div style={styles.searchSlotWrap}>{searchSlot || <HeaderSearch />}</div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <button onClick={onBellClick} className="bell-btn" style={styles.bellButton} aria-label="Notifications">
@@ -76,9 +85,11 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
                   <span style={styles.ringLabel}>{Math.round(progressPercent)}%</span>
                 </div>
               )}
-              <div style={styles.avatar}>
-                {profile?.full_name?.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
-              </div>
+              <Link to="/profile" style={styles.avatarLink} title="Profile">
+                <div style={styles.avatar}>
+                  {profile?.full_name?.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+              </Link>
               <button onClick={signOut} className="signout-btn" style={styles.signOut}>Sign out</button>
             </div>
           </div>
@@ -145,6 +156,7 @@ const styles = {
     position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 11, fontWeight: 800, color: '#fff',
   },
+  avatarLink: { textDecoration: 'none' },
   avatar: {
     width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.22)',
     color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,

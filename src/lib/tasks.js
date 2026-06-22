@@ -362,13 +362,18 @@ export async function fetchNotifications(userId) {
     .select('*, task:tasks(name)')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .limit(20)
+    .limit(100)
   if (error) throw error
   return data
 }
 
 export async function markNotificationRead(id) {
   await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+}
+
+
+export async function markAllNotificationsRead(userId) {
+  await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false)
 }
 
 async function notify(userId, taskId, type, message) {
