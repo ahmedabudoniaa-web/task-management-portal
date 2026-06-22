@@ -60,3 +60,7 @@ drop policy if exists "mentions insert by logged in users" on mentions;
 create policy "mentions insert by logged in users"
 on mentions for insert
 with check (mentioning_user_id = auth.uid());
+
+-- 4) Conversation replies for team mailbox.
+alter table team_messages add column if not exists parent_message_id uuid references team_messages(id) on delete cascade;
+create index if not exists team_messages_parent_message_id_idx on team_messages(parent_message_id);

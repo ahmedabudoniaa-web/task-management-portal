@@ -5,20 +5,26 @@ export async function fetchMailbox(userId) {
     .from('team_messages')
     .select(`
       *,
-      sender:profiles!team_messages_sender_id_fkey(id, full_name, email),
-      recipient:profiles!team_messages_recipient_id_fkey(id, full_name, email)
+      sender:profiles!team_messages_sender_id_fkey(id, full_name, email, job_title),
+      recipient:profiles!team_messages_recipient_id_fkey(id, full_name, email, job_title)
     `)
     .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
     .order('created_at', { ascending: false })
-    .limit(100)
+    .limit(300)
   if (error) throw error
   return data || []
 }
 
-export async function sendTeamMessage({ senderId, recipientId, subject, body }) {
+export async function sendTeamMessage({ senderId, recipientId, subject, body, parentMessageId }) {
   const { data, error } = await supabase
     .from('team_messages')
-    .insert({ sender_id: senderId, recipient_id: recipientId, subject: subject || 'No subject', body })
+    .insert({
+      sender_id: senderId,
+      recipient_id: recipientId,
+      subject: subject || 'No subject',
+      body,
+      parent_message_id: parentMessageId || null,
+    })
     .select()
     .single()
   if (error) throw error
@@ -26,7 +32,7 @@ export async function sendTeamMessage({ senderId, recipientId, subject, body }) 
   await supabase.from('notifications').insert({
     user_id: recipientId,
     type: 'message',
-    message: `New message: ${subject || 'No subject'}`,
+    message: parentMessageId ? `New reply: ${subject || 'No subject'}` : `New message: ${subject || 'No subject'}`,
   })
 
   return data

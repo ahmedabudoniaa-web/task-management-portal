@@ -22,7 +22,7 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
         .bell-btn { position: relative; transition: opacity 0.2s; }
         .bell-btn:hover { opacity: 0.75; }
         .signout-btn { transition: all 0.15s; }
-        .signout-btn:hover { background: var(--surface-2) !important; }
+        .signout-btn:hover { background: var(--surface-2) !important; color: var(--bupa-blue) !important; }
         .header-card { animation: fadeIn 0.35s ease both; }
         .nav-link { text-decoration: none; transition: all 0.15s; }
       `}</style>
@@ -41,7 +41,7 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
                 <p style={styles.greeting}>Hey {profile?.full_name?.split(' ')[0]}, here's today</p>
               </div>
               <div style={styles.navGroup}>
-                <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onPortfolio && !onProjects && !onActions && !onGovernance ? styles.navLinkActive : {}) }}>
+                <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onPortfolio && !onProjects && !onActions && !onGovernance && !onInbox && !onProfile ? styles.navLinkActive : {}) }}>
                   Tasks
                 </Link>
                 <Link to="/portfolio" className="nav-link" style={{ ...styles.navLink, ...(onPortfolio ? styles.navLinkActive : {}) }}>
@@ -65,32 +65,33 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
               </div>
             </div>
 
-            <div style={styles.searchSlotWrap}>{searchSlot || <HeaderSearch />}</div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <button onClick={onBellClick} className="bell-btn" style={styles.bellButton} aria-label="Notifications">
-                <i className="ti ti-bell" style={{ fontSize: 18, color: '#fff' }} aria-hidden="true" />
-                {notifCount > 0 && <span style={styles.bellDot}>{notifCount}</span>}
-              </button>
-              {typeof progressPercent === 'number' && (
-                <div style={styles.ringWrap}>
-                  <svg width="42" height="42" viewBox="0 0 40 40">
-                    <circle cx="20" cy="20" r="17" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="5" />
-                    <circle
-                      cx="20" cy="20" r="17" fill="none" stroke="#fff" strokeWidth="5"
-                      strokeDasharray={`${Math.round(progressPercent * 1.07)} 107`}
-                      strokeLinecap="round" transform="rotate(-90 20 20)"
-                    />
-                  </svg>
-                  <span style={styles.ringLabel}>{Math.round(progressPercent)}%</span>
-                </div>
-              )}
-              <Link to="/profile" style={styles.avatarLink} title="Profile">
-                <div style={styles.avatar}>
-                  {profile?.full_name?.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
-              </Link>
-              <button onClick={signOut} className="signout-btn" style={styles.signOut}>Sign out</button>
+            <div style={styles.rightStack}>
+              <div style={styles.userRow}>
+                <button onClick={onBellClick} className="bell-btn" style={styles.bellButton} aria-label="Notifications">
+                  <i className="ti ti-bell" style={{ fontSize: 18, color: '#fff' }} aria-hidden="true" />
+                  {notifCount > 0 && <span style={styles.bellDot}>{notifCount}</span>}
+                </button>
+                {typeof progressPercent === 'number' && (
+                  <div style={styles.ringWrap}>
+                    <svg width="42" height="42" viewBox="0 0 40 40">
+                      <circle cx="20" cy="20" r="17" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="5" />
+                      <circle
+                        cx="20" cy="20" r="17" fill="none" stroke="#fff" strokeWidth="5"
+                        strokeDasharray={`${Math.round(progressPercent * 1.07)} 107`}
+                        strokeLinecap="round" transform="rotate(-90 20 20)"
+                      />
+                    </svg>
+                    <span style={styles.ringLabel}>{Math.round(progressPercent)}%</span>
+                  </div>
+                )}
+                <Link to="/profile" style={styles.avatarLink} title="Profile">
+                  <div style={styles.avatar}>
+                    {profile?.full_name?.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                </Link>
+                <button onClick={signOut} className="signout-btn" style={styles.signOut}>Sign out</button>
+              </div>
+              <div style={styles.searchUnderSignOut}>{searchSlot || <HeaderSearch />}</div>
             </div>
           </div>
 
@@ -126,52 +127,30 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
 }
 
 const styles = {
-  header: {
-    background: 'linear-gradient(135deg, #0050A0, #2D8FE0)',
-    position: 'relative',
-  },
+  header: { background: 'linear-gradient(135deg, #0050A0, #2D8FE0)', position: 'relative' },
   blobLayer: { position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' },
-  headerInner: { maxWidth: 1100, margin: '0 auto', padding: '20px 24px 18px', position: 'relative' },
-  topRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 20 },
-  searchSlotWrap: { flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 },
-  brandRow: { display: 'flex', alignItems: 'center', gap: 12 },
-  navGroup: { display: 'flex', gap: 4, marginLeft: 12, paddingLeft: 16, borderLeft: '1px solid rgba(255,255,255,0.25)' },
-  navLink: {
-    fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)',
-    padding: '6px 12px', borderRadius: 999,
-  },
+  headerInner: { maxWidth: 1200, margin: '0 auto', padding: '20px 24px 18px', position: 'relative' },
+  topRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 20 },
+  brandRow: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', minWidth: 0 },
+  navGroup: { display: 'flex', gap: 4, marginLeft: 12, paddingLeft: 16, borderLeft: '1px solid rgba(255,255,255,0.25)', flexWrap: 'wrap' },
+  navLink: { fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)', padding: '6px 12px', borderRadius: 999 },
   navLinkActive: { color: '#fff', background: 'rgba(255,255,255,0.18)' },
   logo: { width: 36, height: 36, borderRadius: 11, objectFit: 'cover' },
   brandName: { margin: 0, color: '#fff', fontSize: 15.5, fontWeight: 700 },
   greeting: { margin: '1px 0 0', color: 'rgba(255,255,255,0.78)', fontSize: 11.5 },
-  bellButton: { position: 'relative', background: 'none', border: 'none', padding: 4 },
-  bellDot: {
-    position: 'absolute', top: -3, right: -4, background: '#FF5C72', color: '#fff',
-    fontSize: 10, fontWeight: 700, borderRadius: 999, minWidth: 16, height: 16,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px',
-    border: '1.5px solid #0050A0',
-  },
+  rightStack: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 9, minWidth: 320, maxWidth: 430, flexShrink: 0 },
+  userRow: { display: 'flex', alignItems: 'center', gap: 14 },
+  searchUnderSignOut: { width: '100%' },
+  bellButton: { position: 'relative', background: 'none', border: 'none', padding: 4, cursor: 'pointer' },
+  bellDot: { position: 'absolute', top: -3, right: -4, background: '#FF5C72', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 999, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: '1.5px solid #0050A0' },
   ringWrap: { position: 'relative', width: 42, height: 42 },
-  ringLabel: {
-    position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 11, fontWeight: 800, color: '#fff',
-  },
+  ringLabel: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#fff' },
   avatarLink: { textDecoration: 'none' },
-  avatar: {
-    width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.22)',
-    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700,
-  },
-  signOut: {
-    fontSize: 12.5, color: '#fff', background: 'rgba(255,255,255,0.15)', border: 'none',
-    borderRadius: 'var(--radius)', padding: '7px 14px', fontWeight: 600,
-  },
+  avatar: { width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.22)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 },
+  signOut: { fontSize: 12.5, color: '#fff', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 'var(--radius)', padding: '7px 14px', fontWeight: 600, cursor: 'pointer' },
   tabRow: { display: 'flex', gap: 8, flexWrap: 'wrap', position: 'relative' },
-  tab: {
-    padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700,
-    display: 'inline-flex', alignItems: 'center', gap: 6,
-    background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none',
-  },
+  tab: { padding: '7px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', cursor: 'pointer' },
   tabActive: { background: '#fff', color: 'var(--bupa-blue)' },
   tabDot: { width: 7, height: 7, borderRadius: '50%', display: 'inline-block' },
-  main: { maxWidth: 1100, margin: '0 auto', padding: '24px 24px 60px' },
+  main: { maxWidth: 1200, margin: '0 auto', padding: '24px 24px 60px' },
 }
