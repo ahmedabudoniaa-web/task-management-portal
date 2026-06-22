@@ -50,13 +50,9 @@ export function availableTeamsForCreation(profile, teams = []) {
 }
 
 export function peopleVisibleForTeam(profile, people = [], teamId) {
-  if (canSeeAllTeams(profile)) return people
-  const allowedTeams = new Set(profileTeamIds(profile))
-  const allowedPeople = new Set([profile?.id, ...managedProfileIds(profile)].filter(Boolean))
-  return people.filter((p) => {
-    if (teamId) return p.team_id === teamId || allowedPeople.has(p.id)
-    return allowedTeams.has(p.team_id) || allowedPeople.has(p.id)
-  })
+  // Cross-function assignment: anyone can assign a task to anyone else,
+  // regardless of team. No filtering by team or management chain.
+  return people
 }
 
 export function canManagePerson(profile, personId) {
