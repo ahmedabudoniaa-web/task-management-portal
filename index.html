@@ -4,42 +4,67 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Task Management Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       :root {
-        --bg: #F7F6F3;
-        --surface: #FFFFFF;
-        --surface-2: #F0EEE9;
-        --border: #E4E1D9;
-        --text: #1F1D18;
-        --text-2: #6B6759;
-        --text-3: #A8A399;
-        --accent: #2B5C4B;
-        --accent-light: #E4EEEA;
-        --danger: #B3432F;
-        --danger-light: #FAEAE5;
-        --warning: #A8741E;
-        --warning-light: #FAF1DF;
-        --info: #2E5D8A;
-        --info-light: #E7EFF6;
+        --bg: #060912;
+        --bg-grid: #0a0f1c;
+        --surface: rgba(18, 24, 38, 0.72);
+        --surface-solid: #121826;
+        --surface-2: rgba(26, 34, 52, 0.6);
+        --border: rgba(0, 229, 199, 0.16);
+        --border-strong: rgba(0, 229, 199, 0.4);
+        --text: #EAF2FF;
+        --text-2: #8FA3C4;
+        --text-3: #54627F;
+
+        --bupa-blue: #0050A0;
+        --bupa-blue-bright: #3DA9FC;
+        --pulse: #00E5C7;
+        --pulse-dim: rgba(0, 229, 199, 0.18);
+        --accent: #00E5C7;
+        --accent-light: rgba(0, 229, 199, 0.12);
+
+        --danger: #FF5C72;
+        --danger-light: rgba(255, 92, 114, 0.12);
+        --warning: #FFB23D;
+        --warning-light: rgba(255, 178, 61, 0.12);
+        --info: #3DA9FC;
+        --info-light: rgba(61, 169, 252, 0.12);
+
         --radius: 10px;
-        --radius-lg: 14px;
+        --radius-lg: 16px;
+        --font-display: 'Space Grotesk', sans-serif;
+        --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       }
       * { box-sizing: border-box; }
+      html { background: var(--bg); }
       body {
         margin: 0;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        background: var(--bg);
+        font-family: var(--font-body);
+        background:
+          radial-gradient(circle at 15% 0%, rgba(0, 80, 160, 0.25), transparent 45%),
+          radial-gradient(circle at 85% 10%, rgba(0, 229, 199, 0.12), transparent 40%),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg-grid) 100%);
+        background-attachment: fixed;
         color: var(--text);
         -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
       }
-      button {
-        font-family: inherit;
-        cursor: pointer;
-      }
-      input, select, textarea {
-        font-family: inherit;
-      }
+      button { font-family: inherit; cursor: pointer; }
+      input, select, textarea { font-family: inherit; }
+      input::placeholder, textarea::placeholder { color: var(--text-3); }
+      select option { background: var(--surface-solid); color: var(--text); }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(0, 229, 199, 0.25); border-radius: 8px; }
       #root { min-height: 100vh; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      }
     </style>
   </head>
   <body>
