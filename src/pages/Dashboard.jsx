@@ -8,7 +8,7 @@ import TaskDetail from '../components/TaskDetail'
 import NewTaskModal from '../components/NewTaskModal'
 import RejectionBanner from '../components/RejectionBanner'
 import NotificationsPanel from '../components/NotificationsPanel'
-import { isMBM, isDirector, peopleVisibleForTeam, managedTeamIds } from '../lib/permissions'
+import { isMBM, isDirector, peopleVisibleForTeam, peopleIManage, managedTeamIds } from '../lib/permissions'
 
 const MY_STATUS_FILTERS = [
   { key: 'all', label: 'All' },
@@ -211,7 +211,7 @@ export default function Dashboard() {
         <div style={styles.employeeFilterRow}>
           <select value={employeeFilter} onChange={(e) => setEmployeeFilter(e.target.value)} style={styles.employeeSelect}>
             <option value="">All employees</option>
-            {peopleVisibleForTeam(profile, people, teamFilter || null).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            {peopleIManage(profile, people).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </select>
           {employeeFilter && (
             <button onClick={() => setEmployeeFilter('')} style={styles.clearEmployeeBtn}>Clear</button>

@@ -44,16 +44,23 @@ export function canSeeAllTeams(profile) {
 }
 
 export function availableTeamsForCreation(profile, teams = []) {
-  if (canSeeAllTeams(profile)) return teams
-  const allowed = new Set(profileTeamIds(profile))
-  return teams.filter((t) => allowed.has(t.id))
+  // Anyone can create a task/project for any team (default is their own team,
+  // chosen by the caller). No restriction — cross-team creation is intended.
+  return teams
 }
 
+// People assignable when a specific team is chosen: everyone on that team.
+// Picking a team in a create form shows that team's members so you can assign
+// across teams. With no team, returns everyone.
 export function peopleVisibleForTeam(profile, people = [], teamId) {
-  // You can assign to / filter by yourself and anyone in your management
-  // chain (direct + indirect reports). MBM sees everyone. This is what drives
-  // "see only the people I manage" across assignee pickers and the team-tasks
-  // filter; the managed list comes from the manager_id hierarchy.
+  if (!teamId) return people
+  return people.filter((p) => (p.team_id || p.team?.id) === teamId)
+}
+
+// People you manage (yourself + your reporting chain); MBM sees everyone.
+// Used by monitoring views like the dashboard "Team Tasks" filter, NOT by
+// assignment pickers.
+export function peopleIManage(profile, people = []) {
   if (isMBM(profile)) return people
   const managed = new Set(managedProfileIds(profile))
   return people.filter((p) => p.id === profile?.id || managed.has(p.id))

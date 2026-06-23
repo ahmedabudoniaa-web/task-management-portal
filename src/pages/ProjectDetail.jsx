@@ -9,6 +9,7 @@ import { healthColor } from '../lib/teamColors'
 import { peopleVisibleForTeam } from '../lib/permissions'
 import Shell from '../components/Shell'
 import TaskDetail from '../components/TaskDetail'
+import NewTaskModal from '../components/NewTaskModal'
 import AutoGrowTextarea from '../components/AutoGrowTextarea'
 
 const STATUS_FLOW = ['initiation', 'planning', 'execution', 'final_review', 'closure', 'closed']
@@ -26,6 +27,7 @@ export default function ProjectDetail() {
   const [teams, setTeams] = useState([])
   const [people, setPeople] = useState([])
   const [selectedTaskId, setSelectedTaskId] = useState(null)
+  const [addTaskPhase, setAddTaskPhase] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -492,7 +494,6 @@ export default function ProjectDetail() {
       {(!project.milestones || project.milestones.length === 0) ? (
         <div style={styles.emptyState}><p style={styles.emptyTitle}>No phases yet</p><p style={styles.emptySub}>Break this project into phases, then add tasks under each phase.</p></div>
       ) : project.milestones.map((phase) => {
-        const form = phaseTaskForms[phase.id] || { name: '', description: '', assigneeId: profile.id, targetDate: '', priority: 'medium' }
         const phaseTasks = phase.tasks || []
         const incompleteCount = phaseTasks.filter((t) => t.status !== 'completed').length
         const canMarkDone = phaseTasks.length === 0 || incompleteCount === 0
@@ -520,18 +521,9 @@ export default function ProjectDetail() {
               {phaseTasks.map((t) => <button key={t.id} type="button" onClick={() => setSelectedTaskId(t.id)} style={styles.phaseTaskRow}><span style={styles.phaseTaskName}>{t.name}</span><span style={styles.phaseTaskMeta}>{t.assignee?.full_name || 'Unassigned'} · {t.status?.replaceAll('_', ' ')}</span></button>)}
             </div>
             {canEdit && !isTerminal && (
-              <form onSubmit={(e) => submitPhaseTask(e, phase)} style={styles.phaseTaskForm}>
-                <input value={form.name} onChange={(e) => updatePhaseTaskForm(phase.id, 'name', e.target.value)} placeholder="Add task under this phase" style={{ ...styles.input, flex: 1 }} />
-                <select value={form.assigneeId} onChange={(e) => updatePhaseTaskForm(phase.id, 'assigneeId', e.target.value)} style={styles.input}><option value="">Unassigned</option>{peopleVisibleForTeam(profile, people, project.team_id).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
-                <select value={form.priority} onChange={(e) => updatePhaseTaskForm(phase.id, 'priority', e.target.value)} style={styles.input} title="Priority">
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-                <input type="date" value={form.targetDate} onChange={(e) => updatePhaseTaskForm(phase.id, 'targetDate', e.target.value)} style={styles.input} />
-                <button type="submit" disabled={busy || !form.name.trim()} style={styles.smallBtn}>Add task</button>
-              </form>
+              <button type="button" onClick={() => setAddTaskPhase(phase)} style={styles.addTaskBtn}>
+                <i className="ti ti-plus" style={{ fontSize: 14 }} aria-hidden="true" /> Add task
+              </button>
             )}
           </div>
         )
@@ -574,6 +566,23 @@ export default function ProjectDetail() {
           allTasks={project?.tasks || []}
           onClose={() => setSelectedTaskId(null)}
           onChanged={() => { load() }}
+        />
+      )}
+
+      {addTaskPhase && (
+        <NewTaskModal
+          teams={teams}
+          people={people}
+          lockedProjectId={project.id}
+          lockedProjectName={project.name}
+          lockedTeamId={project.team_id}
+          lockedMilestoneId={addTaskPhase.id}
+          onClose={() => setAddTaskPhase(null)}
+          onCreated={(created) => {
+            setAddTaskPhase(null)
+            load()
+            if (created?.id) setSelectedTaskId(created.id)
+          }}
         />
       )}
     </Shell>
@@ -659,6 +668,7 @@ const styles = {
   phaseTaskName: { fontSize: 13, fontWeight: 700, color: 'var(--text)' },
   phaseTaskMeta: { fontSize: 12, color: 'var(--text-3)' },
   phaseTaskForm: { display: 'grid', gridTemplateColumns: '1.4fr 1fr 0.9fr 0.8fr auto', gap: 8, alignItems: 'center', marginTop: 10 },
+  addTaskBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, border: '1px dashed var(--border-strong)', background: 'var(--surface)', color: 'var(--bupa-blue)', fontWeight: 750, fontSize: 13, padding: '9px 14px', borderRadius: 'var(--radius)', cursor: 'pointer' },
   directTaskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 8, boxShadow: '0 1px 4px rgba(0,80,160,0.04)' },
   directTaskOpen: { minWidth: 0, flex: 1, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', padding: 0 },
   directTaskName: { display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text)' },

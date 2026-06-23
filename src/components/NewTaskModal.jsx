@@ -4,13 +4,14 @@ import { useAuth } from '../lib/AuthContext'
 import { availableTeamsForCreation, isMBM, isDirector, peopleVisibleForTeam } from '../lib/permissions'
 import AutoGrowTextarea from './AutoGrowTextarea'
 
-export default function NewTaskModal({ teams, people, projects, onClose, onCreated }) {
+export default function NewTaskModal({ teams, people, projects, lockedProjectId, lockedProjectName, lockedTeamId, lockedMilestoneId, onClose, onCreated }) {
   const { profile } = useAuth()
+  const locked = Boolean(lockedProjectId)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const allowedTeams = availableTeamsForCreation(profile, teams)
-  const [teamId, setTeamId] = useState(profile.team_id || allowedTeams[0]?.id || '')
-  const [projectId, setProjectId] = useState('')
+  const [teamId, setTeamId] = useState(lockedTeamId || profile.team_id || allowedTeams[0]?.id || '')
+  const [projectId, setProjectId] = useState(lockedProjectId || '')
   const [assigneeId, setAssigneeId] = useState(profile.id)
   const [targetDate, setTargetDate] = useState('')
   const [priority, setPriority] = useState('medium')
@@ -35,18 +36,19 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
     setSaving(true)
     setError(null)
     try {
-      await createTask({
+      const created = await createTask({
         name,
         description,
         teamId,
         projectId: projectId || null,
+        milestoneId: lockedMilestoneId || null,
         ownerId: profile.id,
         assigneeId: assigneeId || null,
         targetDate,
         priority,
         subActions: subActions.filter((s) => s.name.trim()),
       })
-      onCreated()
+      onCreated(created)
     } catch (err) {
       setError(err.message || 'Could not create this task. Please try again.')
     } finally {
@@ -64,6 +66,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
           <div>
             <p style={styles.eyebrow}>Task creation</p>
             <h2 style={styles.title}>New task</h2>
+            {locked && <p style={styles.lockedCtx}>In project: <strong>{lockedProjectName}</strong></p>}
           </div>
           <button onClick={onClose} style={styles.closeBtn} aria-label="Close">×</button>
         </div>
@@ -80,12 +83,14 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
           </label>
 
           <div style={styles.grid2}>
-            <label style={styles.label}>
-              Team <span style={styles.required}>*</span>
-              <select value={teamId} onChange={(e) => setTeamId(e.target.value)} style={styles.input}>
-                {allowedTeams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            </label>
+            {!locked && (
+              <label style={styles.label}>
+                Team <span style={styles.required}>*</span>
+                <select value={teamId} onChange={(e) => { setTeamId(e.target.value); setAssigneeId(profile.id) }} style={styles.input}>
+                  {allowedTeams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </label>
+            )}
             <label style={styles.label}>
               Priority <span style={styles.required}>*</span>
               <select value={priority} onChange={(e) => setPriority(e.target.value)} style={styles.input}>
@@ -97,7 +102,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
             </label>
           </div>
 
-          {projects && projects.length > 0 && (
+          {!locked && projects && projects.length > 0 && (
             <label style={styles.labelWide}>
               Link to project (optional)
               <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={styles.input}>
@@ -193,6 +198,7 @@ const styles = {
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12 },
   eyebrow: { fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px', fontWeight: 800 },
   title: { fontSize: 22, fontWeight: 800, margin: 0 },
+  lockedCtx: { fontSize: 12.5, color: 'var(--text-2)', margin: '4px 0 0' },
   closeBtn: { width: 34, height: 34, borderRadius: 10, border: '1px solid var(--border)', background: '#fff', color: 'var(--text-2)', fontSize: 22, lineHeight: 1, cursor: 'pointer' },
   form: { display: 'flex', flexDirection: 'column', gap: 12 },
   grid2: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 },
