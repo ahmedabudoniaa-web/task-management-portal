@@ -242,7 +242,8 @@ export default function ProjectDetail() {
   const h = healthColor(project.health)
   const isPM = project.project_manager_id === profile.id
   const isSponsor = project.sponsor_id === profile.id
-  const canEdit = profile.is_mbm || isPM || isSponsor
+  const isCoordinator = project.project_coordinator_id === profile.id
+  const canEdit = profile.is_mbm || isPM || isSponsor || isCoordinator
   // Per the original design: the PM requests a stage advance, and either
   // the sponsor or MBM approves it — not the PM themselves.
   const canApproveStage = profile.is_mbm || isSponsor
@@ -340,6 +341,7 @@ export default function ProjectDetail() {
         <div style={styles.peopleRow}>
           <Field label="Sponsor" value={project.sponsor?.full_name || '—'} />
           <Field label="Project manager" value={project.project_manager?.full_name || '—'} />
+          <Field label="Project coordinator" value={project.coordinator?.full_name || '—'} />
           <Field label="Start date" value={formatDate(project.start_date)} />
           <Field label="Target completion" value={formatDate(project.target_completion_date)} />
           <Field label="Stage" value={STATUS_LABELS[project.status] || project.status} />

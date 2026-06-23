@@ -11,6 +11,7 @@ export default function NewProjectModal({ teams, people, onClose, onCreated }) {
   const [teamId, setTeamId] = useState(profile.team_id || allowedTeams[0]?.id || '')
   const [sponsorId, setSponsorId] = useState('')
   const [pmId, setPmId] = useState(profile.id)
+  const [coordinatorId, setCoordinatorId] = useState('')
   const [strategicObjective, setStrategicObjective] = useState('')
   const [businessJustification, setBusinessJustification] = useState('')
   const [expectedOutcome, setExpectedOutcome] = useState('')
@@ -27,6 +28,7 @@ export default function NewProjectModal({ teams, people, onClose, onCreated }) {
     try {
       await createProject({
         name, teamId, sponsorId: sponsorId || null, projectManagerId: pmId || null,
+        projectCoordinatorId: coordinatorId || null,
         strategicObjective, businessJustification, expectedOutcome, successCriteria,
         startDate, targetCompletionDate, createdBy: profile.id,
       })
@@ -78,6 +80,14 @@ export default function NewProjectModal({ teams, people, onClose, onCreated }) {
           <label style={styles.label}>
             Sponsor
             <select value={sponsorId} onChange={(e) => setSponsorId(e.target.value)} style={styles.input}>
+              <option value="">Unassigned</option>
+              {people.map((p) => <option key={p.id} value={p.id}>{p.full_name} ({p.team?.name})</option>)}
+            </select>
+          </label>
+
+          <label style={styles.label}>
+            Project coordinator
+            <select value={coordinatorId} onChange={(e) => setCoordinatorId(e.target.value)} style={styles.input}>
               <option value="">Unassigned</option>
               {people.map((p) => <option key={p.id} value={p.id}>{p.full_name} ({p.team?.name})</option>)}
             </select>

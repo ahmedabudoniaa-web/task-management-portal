@@ -12,6 +12,7 @@ export async function fetchProjects({ profile, teamFilter }) {
       team:teams(id, name),
       sponsor:profiles!projects_sponsor_id_fkey(id, full_name),
       project_manager:profiles!projects_project_manager_id_fkey(id, full_name),
+      coordinator:profiles!projects_project_coordinator_id_fkey(id, full_name),
       milestones(id, percent_complete, status)
     `)
     .order('created_at', { ascending: false })
@@ -22,9 +23,9 @@ export async function fetchProjects({ profile, teamFilter }) {
     if (directorTeams.length > 0) query = query.in('team_id', directorTeams)
     else if (reportIds.length > 0) {
       const ids = [profile.id, ...reportIds]
-      query = query.or(`sponsor_id.in.(${ids.join(',')}),project_manager_id.in.(${ids.join(',')}),created_by.in.(${ids.join(',')})`)
+      query = query.or(`sponsor_id.in.(${ids.join(',')}),project_manager_id.in.(${ids.join(',')}),project_coordinator_id.in.(${ids.join(',')}),created_by.in.(${ids.join(',')})`)
     } else {
-      query = query.or(`sponsor_id.eq.${profile.id},project_manager_id.eq.${profile.id},created_by.eq.${profile.id}`)
+      query = query.or(`sponsor_id.eq.${profile.id},project_manager_id.eq.${profile.id},project_coordinator_id.eq.${profile.id},created_by.eq.${profile.id}`)
     }
   }
   if (teamFilter) {
@@ -44,6 +45,7 @@ export async function fetchProjectDetail(projectId) {
       team:teams(id, name),
       sponsor:profiles!projects_sponsor_id_fkey(id, full_name),
       project_manager:profiles!projects_project_manager_id_fkey(id, full_name),
+      coordinator:profiles!projects_project_coordinator_id_fkey(id, full_name),
       milestones(*, owner:profiles!milestones_owner_id_fkey(id, full_name)),
       project_health_log(*, changer:profiles(id, full_name)),
       tasks(id, name, status, priority, target_date, percent_complete, milestone_id,
@@ -70,7 +72,7 @@ export async function fetchProjectDetail(projectId) {
 }
 
 export async function createProject({
-  name, sponsorId, projectManagerId, teamId, strategicObjective,
+  name, sponsorId, projectManagerId, projectCoordinatorId, teamId, strategicObjective,
   businessJustification, expectedOutcome, successCriteria,
   startDate, targetCompletionDate, createdBy,
 }) {
@@ -80,6 +82,7 @@ export async function createProject({
       name,
       sponsor_id: sponsorId || null,
       project_manager_id: projectManagerId || null,
+      project_coordinator_id: projectCoordinatorId || null,
       team_id: teamId,
       strategic_objective: strategicObjective || null,
       business_justification: businessJustification || null,

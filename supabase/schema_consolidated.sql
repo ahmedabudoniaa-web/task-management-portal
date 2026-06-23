@@ -161,6 +161,7 @@ create table projects (
   name text not null,
   sponsor_id uuid references profiles(id),
   project_manager_id uuid references profiles(id),
+  project_coordinator_id uuid references profiles(id),
   team_id uuid not null references teams(id),
   strategic_objective text,
   business_justification text,
@@ -169,13 +170,17 @@ create table projects (
   start_date date,
   target_completion_date date,
   status text not null default 'initiation'
-    check (status in ('initiation', 'planning', 'execution', 'final_review', 'closure', 'closed')),
-  -- KNOWN GAP (not a bug — documented in the audit, Finding 2.2): no
-  -- 'cancelled' or 'archived' status exists yet. A project that needs to
-  -- stop early currently has no valid status to move to.
+    check (status in ('initiation', 'planning', 'execution', 'final_review', 'closure', 'closed', 'cancelled', 'archived')),
+  closure_note text,
   health text not null default 'green' check (health in ('green', 'amber', 'red')),
   health_reason text,
   percent_complete integer not null default 0 check (percent_complete >= 0 and percent_complete <= 100),
+  -- Soft delete (audit §7 / Finding 6.1): a deleted project is hidden from
+  -- everyone via the "project visibility" policy (deleted_at is null); rows
+  -- are never physically removed.
+  deleted_at timestamptz,
+  deleted_by uuid references profiles(id),
+  deletion_reason text,
   created_by uuid not null references profiles(id),
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -808,23 +813,24 @@ create policy "notifications update own" on notifications for update using (user
 create policy "notifications insert system" on notifications for insert with check (true);
 
 -- ---------- projects ----------
--- KNOWN CLEANUP NEEDED: live database has BOTH "project creation"
--- (created_by = auth.uid() only) AND the older "project insert"
--- (team-restricted) simultaneously. Since RLS ORs all matching policies,
--- the looser one wins in practice — but having both is confusing and
--- should be cleaned up. This file keeps only the looser, correct one,
--- matching the cross-team decision already made for tasks.
+-- Cleaned up: the live database previously carried duplicate "project insert"
+-- and "project update by pm sponsor or mbm" policies — both dropped via
+-- cleanup_duplicate_project_policies.sql (audit §10). These are the single
+-- canonical policies. The coordinator role (audit §8) is included on the same
+-- access pattern as sponsor / project_manager.
 create policy "project creation" on projects for insert with check (created_by = auth.uid());
--- KNOWN CLEANUP NEEDED: live database also has both "project update" AND
--- "project update by pm sponsor or mbm" simultaneously. This file keeps
--- the broader one (includes manager-hierarchy via manages_profile/manages_team).
 create policy "project update" on projects for update using (
-  is_mbm() or manages_team(team_id) or sponsor_id = auth.uid() or project_manager_id = auth.uid()
-  or manages_profile(sponsor_id) or manages_profile(project_manager_id)
+  is_mbm() or manages_team(team_id)
+  or sponsor_id = auth.uid() or project_manager_id = auth.uid() or project_coordinator_id = auth.uid()
+  or manages_profile(sponsor_id) or manages_profile(project_manager_id) or manages_profile(project_coordinator_id)
 );
 create policy "project visibility" on projects for select using (
-  is_mbm() or manages_team(team_id) or sponsor_id = auth.uid() or project_manager_id = auth.uid()
-  or manages_profile(sponsor_id) or manages_profile(project_manager_id) or manages_profile(created_by)
+  deleted_at is null and (
+    is_mbm() or manages_team(team_id)
+    or sponsor_id = auth.uid() or project_manager_id = auth.uid() or project_coordinator_id = auth.uid()
+    or manages_profile(sponsor_id) or manages_profile(project_manager_id)
+    or manages_profile(project_coordinator_id) or manages_profile(created_by)
+  )
 );
 
 -- ---------- milestones ----------
