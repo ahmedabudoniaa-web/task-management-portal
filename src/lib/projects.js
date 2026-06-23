@@ -94,6 +94,51 @@ export async function updateProjectStatus(projectId, status) {
   if (error) throw error
 }
 
+// ---------- PROJECT LIFECYCLE: archive, cancel, close, soft-delete ----------
+// All four are restricted to owner (created_by), project manager, or MBM —
+// access is enforced by the existing "project update" RLS policy (for the
+// first three) and a dedicated check inside deleteProject (since a soft
+// delete is conceptually different from a status change).
+
+export async function archiveProject(projectId, actorId) {
+  const { error } = await supabase.from('projects').update({ status: 'archived' }).eq('id', projectId)
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'archived', detail: 'Project archived' })
+}
+
+export async function cancelProject(projectId, actorId, reason) {
+  const { error } = await supabase.from('projects').update({ status: 'cancelled' }).eq('id', projectId)
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'cancelled', detail: reason || 'Project cancelled' })
+}
+
+// Closing requires a closure note — the database trigger
+// (enforce_closure_checklist) additionally blocks this unless all phases
+// are done and all tasks are completed, regardless of what the UI shows,
+// so this can't be bypassed by a direct API call either.
+export async function closeProject(projectId, actorId, closureNote) {
+  const { error } = await supabase
+    .from('projects')
+    .update({ status: 'closed', closure_note: closureNote })
+    .eq('id', projectId)
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'closed', detail: closureNote })
+}
+
+// Soft delete: the project becomes invisible to everyone (including its
+// own owner/PM) via the updated "project visibility" RLS policy
+// (`deleted_at is null`). Nothing is physically removed — recovering a
+// soft-deleted project is a direct-database operation for now, since
+// there's no in-app "trash" view yet (deferred — see audit backlog).
+export async function deleteProject({ projectId, actorId, reason }) {
+  const { error } = await supabase
+    .from('projects')
+    .update({ deleted_at: new Date().toISOString(), deleted_by: actorId, deletion_reason: reason })
+    .eq('id', projectId)
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'deleted', detail: reason || 'Project deleted' })
+}
+
 // Health changes always require a reason. This writes the log entry first,
 // then the health column update — the database trigger checks the log entry
 // exists before allowing the health column to change (see migration file).

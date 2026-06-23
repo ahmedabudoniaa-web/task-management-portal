@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, linkTaskToMilestone } from '../lib/projects'
+import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, linkTaskToMilestone, archiveProject, cancelProject, closeProject, deleteProject } from '../lib/projects'
 import { createTask, fetchTeams, fetchProfiles, fetchNotifications } from '../lib/tasks'
 import { requestStageAdvance, resolveStageAdvance } from '../lib/governance'
 import { supabase } from '../lib/supabase'
@@ -13,6 +13,7 @@ const STATUS_FLOW = ['initiation', 'planning', 'execution', 'final_review', 'clo
 const STATUS_LABELS = {
   initiation: 'Initiation', planning: 'Planning', execution: 'Execution',
   final_review: 'Final review', closure: 'Closure', closed: 'Closed',
+  cancelled: 'Cancelled', archived: 'Archived',
 }
 
 export default function ProjectDetail() {
@@ -38,6 +39,9 @@ export default function ProjectDetail() {
   const [pendingStageRequest, setPendingStageRequest] = useState(null)
   const [showAdvanceForm, setShowAdvanceForm] = useState(false)
   const [advanceNote, setAdvanceNote] = useState('')
+  const [showLifecycleMenu, setShowLifecycleMenu] = useState(false)
+  const [confirmingAction, setConfirmingAction] = useState(null) // 'cancel' | 'delete' | 'close' | null
+  const [lifecycleReason, setLifecycleReason] = useState('')
 
   async function load() {
     setLoading(true)
@@ -121,6 +125,42 @@ export default function ProjectDetail() {
     })
   }
 
+  function handleArchive() {
+    runAction(async () => {
+      await archiveProject(project.id, profile.id)
+      await load()
+    })
+  }
+
+  function handleCancelConfirmed() {
+    if (!lifecycleReason.trim()) return
+    setConfirmingAction(null)
+    runAction(async () => {
+      await cancelProject(project.id, profile.id, lifecycleReason)
+      setLifecycleReason('')
+      await load()
+    })
+  }
+
+  function handleCloseConfirmed() {
+    if (!lifecycleReason.trim()) return
+    setConfirmingAction(null)
+    runAction(async () => {
+      await closeProject(project.id, profile.id, lifecycleReason)
+      setLifecycleReason('')
+      await load()
+    })
+  }
+
+  function handleDeleteConfirmed() {
+    if (!lifecycleReason.trim()) return
+    setConfirmingAction(null)
+    runAction(async () => {
+      await deleteProject({ projectId: project.id, actorId: profile.id, reason: lifecycleReason })
+      navigate('/projects')
+    })
+  }
+
   function submitPhase(e) {
     e.preventDefault()
     runAction(async () => {
@@ -198,6 +238,12 @@ export default function ProjectDetail() {
   // Per the original design: the PM requests a stage advance, and either
   // the sponsor or MBM approves it — not the PM themselves.
   const canApproveStage = profile.is_mbm || isSponsor
+  // Per the audit decision: delete/archive/cancel/close all share the
+  // SAME restricted access — owner (creator), PM, or MBM. Distinct from
+  // canEdit above, which also includes the sponsor for lighter edits.
+  const isOwner = project.created_by === profile.id
+  const canManageLifecycle = profile.is_mbm || isPM || isOwner
+  const isTerminal = ['closed', 'cancelled', 'archived'].includes(project.status)
   const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(project.status) + 1]
 
   return (
@@ -212,8 +258,73 @@ export default function ProjectDetail() {
             <p style={styles.teamLabel}>{project.team?.name}</p>
             <h1 style={styles.title}>{project.name}</h1>
           </div>
-          <span style={{ ...styles.healthBadge, background: h.bg, color: h.text }}><span style={{ ...styles.healthDot, background: h.text }} />{h.label}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ ...styles.healthBadge, background: h.bg, color: h.text }}><span style={{ ...styles.healthDot, background: h.text }} />{h.label}</span>
+            {canManageLifecycle && project.status !== 'archived' && (
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setShowLifecycleMenu((s) => !s)} style={styles.lifecycleMenuBtn} aria-label="Project actions">
+                  <i className="ti ti-dots-vertical" style={{ fontSize: 16 }} aria-hidden="true" />
+                </button>
+                {showLifecycleMenu && (
+                  <div style={styles.lifecycleMenu} onMouseLeave={() => setShowLifecycleMenu(false)}>
+                    {(project.status === 'closed' || project.status === 'cancelled') && (
+                      <button onClick={() => { setShowLifecycleMenu(false); handleArchive() }} style={styles.lifecycleMenuItem}>
+                        <i className="ti ti-archive" style={{ fontSize: 14 }} aria-hidden="true" /> Archive
+                      </button>
+                    )}
+                    {project.status !== 'closed' && project.status !== 'cancelled' && (
+                      <>
+                        <button onClick={() => { setShowLifecycleMenu(false); setConfirmingAction('close') }} style={styles.lifecycleMenuItem}>
+                          <i className="ti ti-flag-check" style={{ fontSize: 14 }} aria-hidden="true" /> Close project
+                        </button>
+                        <button onClick={() => { setShowLifecycleMenu(false); setConfirmingAction('cancel') }} style={styles.lifecycleMenuItem}>
+                          <i className="ti ti-ban" style={{ fontSize: 14 }} aria-hidden="true" /> Cancel project
+                        </button>
+                      </>
+                    )}
+                    <button onClick={() => { setShowLifecycleMenu(false); setConfirmingAction('delete') }} style={styles.lifecycleMenuItemDanger}>
+                      <i className="ti ti-trash" style={{ fontSize: 14 }} aria-hidden="true" /> Delete project
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+
+        {confirmingAction && (
+          <div style={styles.confirmBox}>
+            <p style={styles.confirmTitle}>
+              {confirmingAction === 'cancel' && 'Cancel this project?'}
+              {confirmingAction === 'close' && 'Close this project?'}
+              {confirmingAction === 'delete' && 'Delete this project?'}
+            </p>
+            <p style={styles.confirmDetail}>
+              {confirmingAction === 'cancel' && 'The project will stop progressing. This can be undone only by an MBM, via direct database access.'}
+              {confirmingAction === 'close' && 'All phases must be done and all tasks completed before a project can close — this will be checked automatically.'}
+              {confirmingAction === 'delete' && 'The project will be hidden from everyone, including you. Nothing is permanently erased, but recovering it requires a database administrator.'}
+            </p>
+            <AutoGrowTextarea
+              value={lifecycleReason} onChange={(e) => setLifecycleReason(e.target.value)}
+              placeholder={confirmingAction === 'close' ? 'Closure note (required)' : 'Reason (required)'}
+              style={styles.textarea}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button
+                onClick={() => {
+                  if (confirmingAction === 'cancel') handleCancelConfirmed()
+                  else if (confirmingAction === 'close') handleCloseConfirmed()
+                  else if (confirmingAction === 'delete') handleDeleteConfirmed()
+                }}
+                disabled={busy || !lifecycleReason.trim()}
+                style={confirmingAction === 'delete' ? styles.dangerBtn : styles.smallBtn}
+              >
+                {busy ? 'Working…' : 'Confirm'}
+              </button>
+              <button onClick={() => { setConfirmingAction(null); setLifecycleReason('') }} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
+            </div>
+          </div>
+        )}
 
         <div style={styles.peopleRow}>
           <Field label="Sponsor" value={project.sponsor?.full_name || '—'} />
@@ -258,7 +369,7 @@ export default function ProjectDetail() {
           </div>
         )}
 
-        {canEdit && (
+        {canEdit && !isTerminal && (
           <div style={styles.actionRow}>
             {nextStatus && !pendingStageRequest && (
               <button onClick={() => setShowAdvanceForm(true)} disabled={busy} style={styles.smallBtn}>
@@ -298,7 +409,7 @@ export default function ProjectDetail() {
 
       <div style={styles.sectionHeader}>
         <h2 style={styles.sectionTitle}>Phases</h2>
-        {canEdit && <button onClick={() => setShowPhaseForm(true)} style={styles.addLink}>+ Add phase</button>}
+        {canEdit && !isTerminal && <button onClick={() => setShowPhaseForm(true)} style={styles.addLink}>+ Add phase</button>}
       </div>
 
       {showPhaseForm && (
@@ -329,7 +440,7 @@ export default function ProjectDetail() {
               {(phase.tasks || []).length === 0 && <p style={styles.emptySub}>No tasks in this phase yet.</p>}
               {(phase.tasks || []).map((t) => <div key={t.id} style={styles.phaseTaskRow}><span style={styles.phaseTaskName}>{t.name}</span><span style={styles.phaseTaskMeta}>{t.assignee?.full_name || 'Unassigned'} · {t.status}</span></div>)}
             </div>
-            {canEdit && (
+            {canEdit && !isTerminal && (
               <form onSubmit={(e) => submitPhaseTask(e, phase)} style={styles.phaseTaskForm}>
                 <input value={form.name} onChange={(e) => updatePhaseTaskForm(phase.id, 'name', e.target.value)} placeholder="Add task under this phase" style={{ ...styles.input, flex: 1 }} />
                 <select value={form.assigneeId} onChange={(e) => updatePhaseTaskForm(phase.id, 'assigneeId', e.target.value)} style={styles.input}><option value="">Unassigned</option>{people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
@@ -372,6 +483,26 @@ const styles = {
   teamLabel: { fontSize: 11.5, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' },
   title: { fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text)' },
   healthBadge: { fontSize: 12, fontWeight: 700, padding: '5px 13px 5px 9px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, whiteSpace: 'nowrap' },
+  lifecycleMenuBtn: { background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '6px 8px', color: 'var(--text-2)', cursor: 'pointer' },
+  lifecycleMenu: {
+    position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: 'var(--surface)',
+    borderRadius: 'var(--radius)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 6,
+    minWidth: 180, zIndex: 20,
+  },
+  lifecycleMenuItem: {
+    display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+    background: 'none', border: 'none', padding: '9px 12px', fontSize: 13, fontWeight: 600,
+    color: 'var(--text)', borderRadius: 'var(--radius)', cursor: 'pointer',
+  },
+  lifecycleMenuItemDanger: {
+    display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+    background: 'none', border: 'none', padding: '9px 12px', fontSize: 13, fontWeight: 600,
+    color: 'var(--danger)', borderRadius: 'var(--radius)', cursor: 'pointer',
+  },
+  confirmBox: { background: 'var(--danger-light)', borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 18 },
+  confirmTitle: { fontSize: 14, fontWeight: 700, color: 'var(--danger)', margin: '0 0 4px' },
+  confirmDetail: { fontSize: 12.5, color: 'var(--danger)', margin: '0 0 10px', lineHeight: 1.5 },
+  dangerBtn: { fontSize: 13, padding: '8px 14px', borderRadius: 'var(--radius)', border: 'none', background: 'var(--danger)', color: '#fff', fontWeight: 700 },
   healthDot: { width: 7, height: 7, borderRadius: '50%', display: 'inline-block' },
   peopleRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, paddingBottom: 18, marginBottom: 18, borderBottom: '1px solid var(--border)' },
   fieldLabel: { fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.03em', margin: '0 0 3px' },
