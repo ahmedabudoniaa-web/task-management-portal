@@ -427,18 +427,30 @@ export default function ProjectDetail() {
         <div style={styles.emptyState}><p style={styles.emptyTitle}>No phases yet</p><p style={styles.emptySub}>Break this project into phases, then add tasks under each phase.</p></div>
       ) : project.milestones.map((phase) => {
         const form = phaseTaskForms[phase.id] || { name: '', description: '', assigneeId: profile.id, targetDate: '', priority: 'medium' }
+        const phaseTasks = phase.tasks || []
+        const incompleteCount = phaseTasks.filter((t) => t.status !== 'completed').length
+        const canMarkDone = phaseTasks.length === 0 || incompleteCount === 0
         return (
           <div key={phase.id} style={styles.phaseCard}>
             <div style={styles.phaseTop}>
               <div><p style={styles.phaseName}>{phase.name}</p><p style={styles.phaseMeta}>{phase.owner?.full_name || 'Unassigned'}{phase.planned_date ? ` · due ${formatDate(phase.planned_date)}` : ''}</p></div>
-              <select value={phase.status} onChange={(e) => runAction(async () => { await updateMilestone(phase.id, { status: e.target.value }); await load() })} disabled={!canEdit || busy} style={styles.phaseStatusSelect}>
-                <option value="not_started">Not started</option><option value="in_progress">In progress</option><option value="done">Done</option>
+              <select
+                value={phase.status}
+                onChange={(e) => runAction(async () => { await updateMilestone(phase.id, { status: e.target.value }); await load() })}
+                disabled={!canEdit || busy}
+                title={!canMarkDone ? `${incompleteCount} task(s) still not completed — finish them to mark this phase done` : undefined}
+                style={styles.phaseStatusSelect}
+              >
+                <option value="not_started">Not started</option>
+                <option value="in_progress">In progress</option>
+                <option value="blocked">Blocked</option>
+                <option value="done" disabled={!canMarkDone}>Done{!canMarkDone ? ` (${incompleteCount} task${incompleteCount === 1 ? '' : 's'} open)` : ''}</option>
               </select>
             </div>
             <div style={styles.phaseProgressTrack}><div style={{ ...styles.phaseProgressFill, width: `${phase.percent_complete || 0}%` }} /></div>
             <div style={styles.phaseTasks}>
-              {(phase.tasks || []).length === 0 && <p style={styles.emptySub}>No tasks in this phase yet.</p>}
-              {(phase.tasks || []).map((t) => <div key={t.id} style={styles.phaseTaskRow}><span style={styles.phaseTaskName}>{t.name}</span><span style={styles.phaseTaskMeta}>{t.assignee?.full_name || 'Unassigned'} · {t.status}</span></div>)}
+              {phaseTasks.length === 0 && <p style={styles.emptySub}>No tasks in this phase yet.</p>}
+              {phaseTasks.map((t) => <div key={t.id} style={styles.phaseTaskRow}><span style={styles.phaseTaskName}>{t.name}</span><span style={styles.phaseTaskMeta}>{t.assignee?.full_name || 'Unassigned'} · {t.status}</span></div>)}
             </div>
             {canEdit && !isTerminal && (
               <form onSubmit={(e) => submitPhaseTask(e, phase)} style={styles.phaseTaskForm}>
