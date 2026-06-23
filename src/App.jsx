@@ -7,6 +7,8 @@ import ProjectDetail from './pages/ProjectDetail'
 import Actions from './pages/Actions'
 import Governance from './pages/Governance'
 import PortfolioDashboard from './pages/PortfolioDashboard'
+import TeamDashboard from './pages/TeamDashboard'
+import ProjectDashboard from './pages/ProjectDashboard'
 import Profile from './pages/Profile'
 import Inbox from './pages/Inbox'
 
@@ -28,8 +30,10 @@ function AppInner() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/portfolio" element={<PortfolioDashboard />} />
+        <Route path="/teams" element={<TeamDashboard />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/:projectId" element={<ProjectDetail />} />
+        <Route path="/projects/:projectId/dashboard" element={<ProjectDashboard />} />
         <Route path="/actions" element={<Actions />} />
         <Route path="/governance" element={<Governance />} />
         <Route path="/profile" element={<Profile />} />

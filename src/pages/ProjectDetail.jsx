@@ -259,6 +259,9 @@ export default function ProjectDetail() {
             <h1 style={styles.title}>{project.name}</h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => navigate(`/projects/${project.id}/dashboard`)} style={styles.dashboardLinkBtn}>
+              <i className="ti ti-chart-donut" style={{ fontSize: 14 }} aria-hidden="true" /> Dashboard
+            </button>
             <span style={{ ...styles.healthBadge, background: h.bg, color: h.text }}><span style={{ ...styles.healthDot, background: h.text }} />{h.label}</span>
             {canManageLifecycle && project.status !== 'archived' && (
               <div style={{ position: 'relative' }}>
@@ -497,6 +500,7 @@ const styles = {
   title: { fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text)' },
   healthBadge: { fontSize: 12, fontWeight: 700, padding: '5px 13px 5px 9px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0, whiteSpace: 'nowrap' },
   lifecycleMenuBtn: { background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '6px 8px', color: 'var(--text-2)', cursor: 'pointer' },
+  dashboardLinkBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '7px 12px', color: 'var(--bupa-blue)', fontWeight: 750, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap' },
   lifecycleMenu: {
     position: 'absolute', top: 'calc(100% + 6px)', right: 0, background: 'var(--surface)',
     borderRadius: 'var(--radius)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', padding: 6,

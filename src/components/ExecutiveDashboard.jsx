@@ -10,6 +10,8 @@ export default function ExecutiveDashboard({ metrics, pendingDecisionCount }) {
         <Metric label="Delayed" value={metrics.delayed} accent="var(--danger)" />
         <Metric label="At risk (amber/red)" value={metrics.atRisk} accent="var(--warning)" />
         <Metric label="Completed" value={metrics.completed} accent="var(--success)" />
+        <Metric label="Cancelled" value={metrics.cancelled} accent="var(--text-3)" />
+        <Metric label="Archived" value={metrics.archived} accent="var(--text-3)" />
         <Metric label="Needs decision" value={pendingDecisionCount} accent="var(--bupa-blue)" />
         <Metric label="Open actions" value={metrics.openActions} />
         <Metric label="Overdue actions" value={metrics.overdueActions} accent="var(--danger)" />

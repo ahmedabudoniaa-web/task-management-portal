@@ -10,6 +10,7 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
   const visibleTeamTabs = isMBM(profile) ? teams : teams.filter((t) => visibleTeamIds.has(t.id))
   const location = useLocation()
   const onPortfolio = location.pathname.startsWith('/portfolio')
+  const onTeams = location.pathname.startsWith('/teams')
   const onProjects = location.pathname.startsWith('/projects')
   const onActions = location.pathname.startsWith('/actions')
   const onGovernance = location.pathname.startsWith('/governance')
@@ -104,11 +105,14 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
           </div>
 
           <nav className="nav-scroll" style={styles.navGroup} aria-label="Main navigation">
-            <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onPortfolio && !onProjects && !onActions && !onGovernance && !onInbox && !onProfile ? styles.navLinkActive : {}) }}>
+            <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onPortfolio && !onTeams && !onProjects && !onActions && !onGovernance && !onInbox && !onProfile ? styles.navLinkActive : {}) }}>
               Tasks
             </Link>
             <Link to="/portfolio" className="nav-link" style={{ ...styles.navLink, ...(onPortfolio ? styles.navLinkActive : {}) }}>
               Portfolio
+            </Link>
+            <Link to="/teams" className="nav-link" style={{ ...styles.navLink, ...(onTeams ? styles.navLinkActive : {}) }}>
+              Teams
             </Link>
             <Link to="/projects" className="nav-link" style={{ ...styles.navLink, ...(onProjects ? styles.navLinkActive : {}) }}>
               Projects

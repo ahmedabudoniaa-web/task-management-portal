@@ -5,6 +5,7 @@ import { fetchProjects } from '../lib/projects'
 import { fetchTasks, fetchTeams, fetchNotifications, markNotificationRead } from '../lib/tasks'
 import { fetchActions } from '../lib/governance'
 import { fetchRisks, fetchIssues, fetchDecisions } from '../lib/risks'
+import { PROJECT_STATUS_ORDER, isActiveProject } from '../lib/dashboard'
 import Shell from '../components/Shell'
 import NotificationsPanel from '../components/NotificationsPanel'
 
@@ -102,8 +103,10 @@ export default function PortfolioDashboard() {
   useEffect(() => { loadAll() }, [teamFilter])
 
   const metrics = useMemo(() => {
-    const activeProjects = projects.filter((p) => !CLOSED_PROJECT_STATUSES.includes(p.status))
-    const closedProjects = projects.filter((p) => CLOSED_PROJECT_STATUSES.includes(p.status))
+    const activeProjects = projects.filter(isActiveProject)
+    const closedProjects = projects.filter((p) => p.status === 'closed')
+    const cancelledProjects = projects.filter((p) => p.status === 'cancelled')
+    const archivedProjects = projects.filter((p) => p.status === 'archived')
     const delayedProjects = activeProjects.filter((p) => isPast(p.target_completion_date) && calculateProjectProgress(p) < 100)
     const atRiskProjects = activeProjects.filter((p) => ['red', 'amber'].includes(p.health))
     const openTasks = tasks.filter((t) => !DONE_TASK_STATUSES.includes(t.status))
@@ -126,6 +129,8 @@ export default function PortfolioDashboard() {
       totalProjects: projects.length,
       activeProjects: activeProjects.length,
       closedProjects: closedProjects.length,
+      cancelledProjects: cancelledProjects.length,
+      archivedProjects: archivedProjects.length,
       delayedProjects: delayedProjects.length,
       atRiskProjects: atRiskProjects.length,
       openTasks: openTasks.length,
@@ -141,7 +146,7 @@ export default function PortfolioDashboard() {
   }, [projects, tasks, actions, risks, issues, decisions])
 
   const healthBreakdown = useMemo(() => groupCount(projects, 'health', ['green', 'amber', 'red']), [projects])
-  const statusBreakdown = useMemo(() => groupCount(projects, 'status', ['initiation', 'planning', 'execution', 'final_review', 'closure', 'closed']), [projects])
+  const statusBreakdown = useMemo(() => groupCount(projects, 'status', PROJECT_STATUS_ORDER), [projects])
 
   const upcomingPhases = useMemo(() => {
     const phases = []
@@ -314,6 +319,8 @@ export default function PortfolioDashboard() {
             <MiniInsight label="Overdue tasks" value={metrics.overdueTasks} tone="danger" />
             <MiniInsight label="Pending decisions" value={metrics.pendingDecisions} tone="warning" />
             <MiniInsight label="Closed projects" value={metrics.closedProjects} tone="success" />
+            <MiniInsight label="Cancelled" value={metrics.cancelledProjects} />
+            <MiniInsight label="Archived" value={metrics.archivedProjects} />
           </div>
         </>
       )}

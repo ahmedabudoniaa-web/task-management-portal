@@ -1,15 +1,34 @@
 // Dashboard helpers used by GlobalSearch and executive widgets.
 
+// ---------- SHARED PROJECT-STATUS SETS ----------
+// Single source of truth for what each project status means to reporting.
+// (The live DB allows all eight; `schema_consolidated.sql` is stale and
+// still lists only the first six — re-sync it when convenient.)
+// A project is "active" only if it is NOT in one of the three terminal
+// states. Previously the dashboards treated anything that wasn't 'closed'
+// as active, which silently counted cancelled and archived projects as
+// live work — fixed here and consumed everywhere via these exports.
+export const PROJECT_STATUS_ORDER = [
+  'initiation', 'planning', 'execution', 'final_review', 'closure',
+  'closed', 'cancelled', 'archived',
+]
+export const TERMINAL_PROJECT_STATUSES = ['closed', 'cancelled', 'archived']
+export const isActiveProject = (p) => !TERMINAL_PROJECT_STATUSES.includes(p.status)
+
 export function computeExecutiveMetrics({ projects, actions }) {
   const now = new Date()
 
-  const active = projects.filter((p) => p.status !== 'closed').length
+  const active = projects.filter(isActiveProject).length
   const completed = projects.filter((p) => p.status === 'closed').length
+  const cancelled = projects.filter((p) => p.status === 'cancelled').length
+  const archived = projects.filter((p) => p.status === 'archived').length
+  // Delayed and at-risk only make sense for live work — a cancelled or
+  // archived project can't be "delayed".
   const delayed = projects.filter((p) => {
-    if (!p.target_completion_date || p.status === 'closed') return false
+    if (!p.target_completion_date || !isActiveProject(p)) return false
     return new Date(p.target_completion_date) < now && p.percent_complete < 100
   }).length
-  const atRisk = projects.filter((p) => p.health === 'red' || p.health === 'amber').length
+  const atRisk = projects.filter((p) => isActiveProject(p) && (p.health === 'red' || p.health === 'amber')).length
 
   const openActions = actions.filter((a) => a.status === 'open' || a.status === 'in_progress').length
   const overdueActions = actions.filter((a) => {
@@ -30,6 +49,8 @@ export function computeExecutiveMetrics({ projects, actions }) {
   return {
     active,
     completed,
+    cancelled,
+    archived,
     delayed,
     atRisk,
     openActions,
