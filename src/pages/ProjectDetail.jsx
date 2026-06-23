@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, archiveProject, cancelProject, closeProject, deleteProject } from '../lib/projects'
-import { createTask, fetchTeams, fetchProfiles, fetchNotifications } from '../lib/tasks'
+import { createTask, moveTaskToPhase, fetchTeams, fetchProfiles, fetchNotifications } from '../lib/tasks'
 import { requestStageAdvance, resolveStageAdvance } from '../lib/governance'
 import { supabase } from '../lib/supabase'
 import { healthColor } from '../lib/teamColors'
@@ -207,6 +207,14 @@ export default function ProjectDetail() {
         subActions: [],
       })
       setPhaseTaskForms((forms) => ({ ...forms, [phase.id]: { name: '', description: '', assigneeId: profile.id, targetDate: '', priority: 'medium' } }))
+      await load()
+    })
+  }
+
+  function handleMoveToPhase(taskId, milestoneId) {
+    if (!milestoneId) return
+    runAction(async () => {
+      await moveTaskToPhase(taskId, milestoneId)
       await load()
     })
   }
@@ -460,6 +468,12 @@ export default function ProjectDetail() {
               <form onSubmit={(e) => submitPhaseTask(e, phase)} style={styles.phaseTaskForm}>
                 <input value={form.name} onChange={(e) => updatePhaseTaskForm(phase.id, 'name', e.target.value)} placeholder="Add task under this phase" style={{ ...styles.input, flex: 1 }} />
                 <select value={form.assigneeId} onChange={(e) => updatePhaseTaskForm(phase.id, 'assigneeId', e.target.value)} style={styles.input}><option value="">Unassigned</option>{people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
+                <select value={form.priority} onChange={(e) => updatePhaseTaskForm(phase.id, 'priority', e.target.value)} style={styles.input} title="Priority">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
                 <input type="date" value={form.targetDate} onChange={(e) => updatePhaseTaskForm(phase.id, 'targetDate', e.target.value)} style={styles.input} />
                 <button type="submit" disabled={busy || !form.name.trim()} style={styles.smallBtn}>Add task</button>
               </form>
@@ -471,7 +485,30 @@ export default function ProjectDetail() {
       {project.direct_tasks && project.direct_tasks.length > 0 && (
         <>
           <div style={styles.sectionHeader}><h2 style={styles.sectionTitle}>Tasks without phase</h2></div>
-          {project.direct_tasks.map((t) => <div key={t.id} style={styles.directTaskRow}><span style={styles.directTaskName}>{t.name}</span><span style={styles.directTaskMeta}>{t.assignee?.full_name || 'Unassigned'}</span></div>)}
+          <p style={styles.directTaskHint}>
+            These tasks belong to the project but aren&apos;t filed under a phase yet.
+            {canEdit && !isTerminal && (project.milestones || []).length > 0 ? ' File each one under a phase to keep the plan organized.' : ''}
+          </p>
+          {project.direct_tasks.map((t) => (
+            <div key={t.id} style={styles.directTaskRow}>
+              <span style={{ minWidth: 0 }}>
+                <span style={styles.directTaskName}>{t.name}</span>
+                <span style={styles.directTaskMeta}>{t.assignee?.full_name || 'Unassigned'} · {t.status?.replaceAll('_', ' ')}</span>
+              </span>
+              {canEdit && !isTerminal && (project.milestones || []).length > 0 && (
+                <select
+                  value=""
+                  onChange={(e) => handleMoveToPhase(t.id, e.target.value)}
+                  disabled={busy}
+                  style={styles.moveSelect}
+                  title="Move this task under a phase"
+                >
+                  <option value="">Move to phase…</option>
+                  {(project.milestones || []).map((ph) => <option key={ph.id} value={ph.id}>{ph.name}</option>)}
+                </select>
+              )}
+            </div>
+          ))}
         </>
       )}
     </Shell>
@@ -556,10 +593,12 @@ const styles = {
   phaseTaskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: '8px 10px', gap: 10 },
   phaseTaskName: { fontSize: 13, fontWeight: 700, color: 'var(--text)' },
   phaseTaskMeta: { fontSize: 12, color: 'var(--text-3)' },
-  phaseTaskForm: { display: 'grid', gridTemplateColumns: '1.4fr 1fr 0.8fr auto', gap: 8, alignItems: 'center', marginTop: 10 },
-  directTaskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 8, boxShadow: '0 1px 4px rgba(0,80,160,0.04)' },
-  directTaskName: { fontSize: 13.5, fontWeight: 600, color: 'var(--text)' },
-  directTaskMeta: { fontSize: 12, color: 'var(--text-3)' },
+  phaseTaskForm: { display: 'grid', gridTemplateColumns: '1.4fr 1fr 0.9fr 0.8fr auto', gap: 8, alignItems: 'center', marginTop: 10 },
+  directTaskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 8, boxShadow: '0 1px 4px rgba(0,80,160,0.04)' },
+  directTaskName: { display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text)' },
+  directTaskMeta: { display: 'block', fontSize: 12, color: 'var(--text-3)', marginTop: 2, textTransform: 'capitalize' },
+  directTaskHint: { fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 12px', maxWidth: 620 },
+  moveSelect: { fontSize: 12.5, padding: '6px 9px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: '#fff', color: 'var(--text-2)', flexShrink: 0, cursor: 'pointer' },
   smallBtn: { fontSize: 13, padding: '8px 14px', borderRadius: 'var(--radius)', border: 'none', background: 'var(--bupa-blue)', color: '#fff', fontWeight: 700 },
   smallBtnOutline: { fontSize: 13, padding: '8px 14px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'none', color: 'var(--text)', fontWeight: 600 },
   emptyState: { textAlign: 'center', padding: '50px 0', color: 'var(--text-3)' },

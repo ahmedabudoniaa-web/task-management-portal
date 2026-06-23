@@ -355,6 +355,14 @@ export async function updatePercentComplete(taskId, percent) {
   if (error) throw error
 }
 
+// Reassign a task to a phase (milestone) within its project — used by the
+// "Tasks without phase" triage list on the project page so a stray task can
+// be filed under a phase without recreating it. Passing null detaches it.
+export async function moveTaskToPhase(taskId, milestoneId) {
+  const { error } = await supabase.from('tasks').update({ milestone_id: milestoneId || null }).eq('id', taskId)
+  if (error) throw error
+}
+
 // If the task has unfinished finish-to-start dependencies, the database
 // trigger (enforce_dependency_before_completion) rejects this update and
 // the resulting Postgres error message — which already explains why —
