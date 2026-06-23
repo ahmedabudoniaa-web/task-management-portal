@@ -37,6 +37,34 @@ export async function fetchProjects({ profile, teamFilter }) {
   return data
 }
 
+export async function fetchDeletedProjects({ profile }) {
+  let query = supabase
+    .from('projects')
+    .select(`
+      *,
+      team:teams(id, name),
+      deleter:profiles!projects_deleted_by_fkey(id, full_name)
+    `)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+
+  if (!isMBM(profile)) {
+    const directorTeams = managedTeamIds(profile)
+    const reportIds = managedProfileIds(profile)
+    if (directorTeams.length > 0) query = query.in('team_id', directorTeams)
+    else if (reportIds.length > 0) {
+      const ids = [profile.id, ...reportIds]
+      query = query.or(`sponsor_id.in.(${ids.join(',')}),project_manager_id.in.(${ids.join(',')}),project_coordinator_id.in.(${ids.join(',')}),created_by.in.(${ids.join(',')})`)
+    } else {
+      query = query.or(`sponsor_id.eq.${profile.id},project_manager_id.eq.${profile.id},project_coordinator_id.eq.${profile.id},created_by.eq.${profile.id}`)
+    }
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return data
+}
+
 export async function fetchProjectDetail(projectId) {
   const { data, error } = await supabase
     .from('projects')
@@ -165,6 +193,18 @@ export async function deleteProject({ projectId, actorId, reason }) {
     .eq('id', projectId)
   if (error) throw error
   await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'deleted', detail: reason || 'Project deleted' })
+}
+
+// Restore a soft-deleted project — clears the deletion markers so it becomes
+// visible again under the normal "project visibility" policy. Restricted to
+// the project's managers/owner/MBM by the "project update" policy.
+export async function restoreProject(projectId, actorId) {
+  const { error } = await supabase
+    .from('projects')
+    .update({ deleted_at: null, deleted_by: null, deletion_reason: null })
+    .eq('id', projectId)
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'restored', detail: 'Project restored from trash' })
 }
 
 // Health changes always require a reason. This writes the log entry first,

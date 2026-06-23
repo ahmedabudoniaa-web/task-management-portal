@@ -116,9 +116,14 @@ export default function Projects() {
     >
       <div style={styles.topBar}>
         <h1 style={styles.pageTitle}>Projects</h1>
-        <button onClick={() => setShowNewProject(true)} style={styles.newBtn}>
-          <i className="ti ti-plus" style={{ fontSize: 14 }} aria-hidden="true" /> New project
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button onClick={() => navigate('/trash')} style={styles.trashLink}>
+            <i className="ti ti-trash" style={{ fontSize: 14 }} aria-hidden="true" /> Deleted
+          </button>
+          <button onClick={() => setShowNewProject(true)} style={styles.newBtn}>
+            <i className="ti ti-plus" style={{ fontSize: 14 }} aria-hidden="true" /> New project
+          </button>
+        </div>
       </div>
 
       {!loading && !loadError && (
@@ -206,6 +211,11 @@ const styles = {
     borderRadius: 'var(--radius)', border: 'none',
     background: 'linear-gradient(135deg, #0050A0, #2D8FE0)',
     color: '#fff', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,80,160,0.2)',
+  },
+  trashLink: {
+    display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, padding: '9px 14px',
+    borderRadius: 'var(--radius)', border: '1px solid var(--border)',
+    background: 'var(--surface)', color: 'var(--text-2)', flexShrink: 0,
   },
   filterBar: { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 },
   filterSelect: { fontSize: 12.5, padding: '7px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: '#fff', color: 'var(--text-2)' },

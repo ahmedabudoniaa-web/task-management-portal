@@ -846,6 +846,16 @@ create policy "project visibility" on projects for select using (
     or manages_profile(project_coordinator_id) or manages_profile(created_by)
   )
 );
+-- Deleted rows are visible only to managers/owner/MBM, for the in-app Trash view.
+create policy "deleted project visibility" on projects for select using (
+  deleted_at is not null and (
+    is_mbm() or manages_team(team_id)
+    or sponsor_id = auth.uid() or project_manager_id = auth.uid() or project_coordinator_id = auth.uid()
+    or created_by = auth.uid()
+    or manages_profile(sponsor_id) or manages_profile(project_manager_id)
+    or manages_profile(project_coordinator_id) or manages_profile(created_by)
+  )
+);
 
 -- project_teams: additional-team membership (audit §8 / Finding 7.1).
 alter table project_teams enable row level security;
