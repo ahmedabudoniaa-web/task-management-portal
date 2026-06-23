@@ -186,6 +186,20 @@ create table projects (
   updated_at timestamptz default now()
 );
 
+-- Additional teams attached to a project beyond the owner team (projects.team_id).
+-- Audit §8 / Finding 7.1. The owner team stays on projects.team_id; this table
+-- holds contributing / supporting / approver teams.
+create table project_teams (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references projects(id) on delete cascade,
+  team_id uuid not null references teams(id),
+  role text not null default 'contributing'
+    check (role in ('owner', 'contributing', 'supporting', 'approver')),
+  created_by uuid references profiles(id),
+  created_at timestamptz default now(),
+  unique (project_id, team_id, role)
+);
+
 create table milestones (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references projects(id),
@@ -831,6 +845,22 @@ create policy "project visibility" on projects for select using (
     or manages_profile(sponsor_id) or manages_profile(project_manager_id)
     or manages_profile(project_coordinator_id) or manages_profile(created_by)
   )
+);
+
+-- project_teams: additional-team membership (audit §8 / Finding 7.1).
+alter table project_teams enable row level security;
+create policy "project_teams visibility" on project_teams for select using (
+  exists (select 1 from projects p where p.id = project_teams.project_id)
+);
+create policy "project_teams insert" on project_teams for insert with check (
+  exists (select 1 from projects p where p.id = project_teams.project_id
+    and (is_mbm() or manages_team(p.team_id) or p.sponsor_id = auth.uid()
+      or p.project_manager_id = auth.uid() or p.project_coordinator_id = auth.uid()))
+);
+create policy "project_teams delete" on project_teams for delete using (
+  exists (select 1 from projects p where p.id = project_teams.project_id
+    and (is_mbm() or manages_team(p.team_id) or p.sponsor_id = auth.uid()
+      or p.project_manager_id = auth.uid() or p.project_coordinator_id = auth.uid()))
 );
 
 -- ---------- milestones ----------

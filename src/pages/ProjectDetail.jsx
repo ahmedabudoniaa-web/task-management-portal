@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, archiveProject, cancelProject, closeProject, deleteProject } from '../lib/projects'
+import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, archiveProject, cancelProject, closeProject, deleteProject, addProjectTeam, removeProjectTeam } from '../lib/projects'
 import { createTask, moveTaskToPhase, fetchTeams, fetchProfiles, fetchNotifications } from '../lib/tasks'
 import { requestStageAdvance, resolveStageAdvance } from '../lib/governance'
 import { supabase } from '../lib/supabase'
@@ -36,6 +36,7 @@ export default function ProjectDetail() {
   const [phaseOwner, setPhaseOwner] = useState('')
   const [phaseDate, setPhaseDate] = useState('')
   const [phaseTaskForms, setPhaseTaskForms] = useState({})
+  const [newTeam, setNewTeam] = useState({ teamId: '', role: 'contributing' })
   const [pendingStageRequest, setPendingStageRequest] = useState(null)
   const [showAdvanceForm, setShowAdvanceForm] = useState(false)
   const [advanceNote, setAdvanceNote] = useState('')
@@ -219,6 +220,23 @@ export default function ProjectDetail() {
     })
   }
 
+  function handleAddTeam(e) {
+    e.preventDefault()
+    if (!newTeam.teamId) return
+    runAction(async () => {
+      await addProjectTeam({ projectId: project.id, teamId: newTeam.teamId, role: newTeam.role, actorId: profile.id })
+      setNewTeam({ teamId: '', role: 'contributing' })
+      await load()
+    })
+  }
+
+  function handleRemoveTeam(id) {
+    runAction(async () => {
+      await removeProjectTeam({ id, projectId: project.id, actorId: profile.id })
+      await load()
+    })
+  }
+
   const unreadCount = notifications.filter((n) => !n.is_read).length
 
   if (loadError) {
@@ -357,6 +375,37 @@ export default function ProjectDetail() {
           <InfoBox title="Business justification" text={project.business_justification} />
           <InfoBox title="Expected outcome" text={project.expected_outcome} />
           <InfoBox title="Success criteria" text={project.success_criteria} />
+        </div>
+
+        <div style={styles.teamsBlock}>
+          <p style={styles.teamsLabel}>Teams</p>
+          <div style={styles.teamChips}>
+            <span style={styles.teamChipOwner}>{project.team?.name || 'Owner team'} · Owner</span>
+            {(project.project_teams || []).map((pt) => (
+              <span key={pt.id} style={styles.teamChip}>
+                {pt.team?.name} · <span style={{ textTransform: 'capitalize' }}>{pt.role}</span>
+                {canEdit && !isTerminal && (
+                  <button onClick={() => handleRemoveTeam(pt.id)} disabled={busy} style={styles.teamChipRemove} title="Remove team" aria-label="Remove team">×</button>
+                )}
+              </span>
+            ))}
+          </div>
+          {canEdit && !isTerminal && (
+            <form onSubmit={handleAddTeam} style={styles.addTeamForm}>
+              <select value={newTeam.teamId} onChange={(e) => setNewTeam((s) => ({ ...s, teamId: e.target.value }))} style={styles.input}>
+                <option value="">Add a team…</option>
+                {teams
+                  .filter((t) => t.id !== project.team_id && !(project.project_teams || []).some((pt) => pt.team_id === t.id))
+                  .map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <select value={newTeam.role} onChange={(e) => setNewTeam((s) => ({ ...s, role: e.target.value }))} style={styles.input}>
+                <option value="contributing">Contributing</option>
+                <option value="supporting">Supporting</option>
+                <option value="approver">Approver</option>
+              </select>
+              <button type="submit" disabled={busy || !newTeam.teamId} style={styles.smallBtn}>Add</button>
+            </form>
+          )}
         </div>
 
         {pendingStageRequest && (
@@ -601,6 +650,13 @@ const styles = {
   directTaskMeta: { display: 'block', fontSize: 12, color: 'var(--text-3)', marginTop: 2, textTransform: 'capitalize' },
   directTaskHint: { fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 12px', maxWidth: 620 },
   moveSelect: { fontSize: 12.5, padding: '6px 9px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: '#fff', color: 'var(--text-2)', flexShrink: 0, cursor: 'pointer' },
+  teamsBlock: { marginTop: 18, paddingTop: 16, borderTop: '1px solid var(--border)' },
+  teamsLabel: { fontSize: 11.5, fontWeight: 900, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.03em', margin: '0 0 10px' },
+  teamChips: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  teamChipOwner: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, borderRadius: 999, padding: '5px 11px', background: 'var(--info-light)', color: 'var(--info)', textTransform: 'capitalize' },
+  teamChip: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, borderRadius: 999, padding: '5px 11px', background: 'var(--surface-2)', color: 'var(--text-2)' },
+  teamChipRemove: { border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 15, lineHeight: 1, cursor: 'pointer', padding: 0, marginLeft: 2 },
+  addTeamForm: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   smallBtn: { fontSize: 13, padding: '8px 14px', borderRadius: 'var(--radius)', border: 'none', background: 'var(--bupa-blue)', color: '#fff', fontWeight: 700 },
   smallBtnOutline: { fontSize: 13, padding: '8px 14px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'none', color: 'var(--text)', fontWeight: 600 },
   emptyState: { textAlign: 'center', padding: '50px 0', color: 'var(--text-3)' },

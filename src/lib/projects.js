@@ -46,6 +46,7 @@ export async function fetchProjectDetail(projectId) {
       sponsor:profiles!projects_sponsor_id_fkey(id, full_name),
       project_manager:profiles!projects_project_manager_id_fkey(id, full_name),
       coordinator:profiles!projects_project_coordinator_id_fkey(id, full_name),
+      project_teams(id, team_id, role, team:teams(id, name)),
       milestones(*, owner:profiles!milestones_owner_id_fkey(id, full_name)),
       project_health_log(*, changer:profiles(id, full_name)),
       tasks(id, name, status, priority, target_date, percent_complete, milestone_id,
@@ -102,6 +103,23 @@ export async function createProject({
 export async function updateProjectStatus(projectId, status) {
   const { error } = await supabase.from('projects').update({ status }).eq('id', projectId)
   if (error) throw error
+}
+
+// ---------- MULTI-TEAM (audit §8 / Finding 7.1) ----------
+// Additional teams beyond the owner team (projects.team_id). Each carries a
+// role; access is enforced by the project_teams RLS policies.
+export async function addProjectTeam({ projectId, teamId, role, actorId }) {
+  const { error } = await supabase
+    .from('project_teams')
+    .insert({ project_id: projectId, team_id: teamId, role: role || 'contributing', created_by: actorId })
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'team_added', detail: `Team added as ${role || 'contributing'}` })
+}
+
+export async function removeProjectTeam({ id, projectId, actorId }) {
+  const { error } = await supabase.from('project_teams').delete().eq('id', id)
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'team_removed', detail: 'Team removed' })
 }
 
 // ---------- PROJECT LIFECYCLE: archive, cancel, close, soft-delete ----------
