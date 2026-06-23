@@ -44,20 +44,27 @@ export async function fetchProjectDetail(projectId) {
       team:teams(id, name),
       sponsor:profiles!projects_sponsor_id_fkey(id, full_name),
       project_manager:profiles!projects_project_manager_id_fkey(id, full_name),
-      milestones(*, owner:profiles!milestones_owner_id_fkey(id, full_name), tasks(id, name, status, percent_complete, assignee:profiles!tasks_assignee_id_fkey(id, full_name))),
+      milestones(*, owner:profiles!milestones_owner_id_fkey(id, full_name)),
       project_health_log(*, changer:profiles(id, full_name)),
-      tasks(id, name, status, priority, target_date, owner:profiles!tasks_owner_id_fkey(id, full_name), assignee:profiles!tasks_assignee_id_fkey(id, full_name))
+      tasks(id, name, status, priority, target_date, percent_complete, milestone_id,
+        owner:profiles!tasks_owner_id_fkey(id, full_name), assignee:profiles!tasks_assignee_id_fkey(id, full_name))
     `)
     .eq('id', projectId)
     .order('sort_order', { referencedTable: 'milestones', ascending: true })
     .single()
   if (error) throw error
-  // tasks here are ALL tasks with this project_id, including ones also
-  // linked to a milestone (those appear in both places). Filter to just
-  // the unlinked-to-milestone ones for a clean "direct" list in the UI.
+
+  // project_id is now the SINGLE source of truth for project membership
+  // (see reshape_task_project_linkage.sql) — every task above already
+  // belongs to this project. milestone_id is just "which phase is this
+  // grouped under, if any," so grouping happens client-side from one
+  // query result instead of needing a second query path + de-duplication.
   if (data) {
-    const milestoneTaskIds = new Set((data.milestones || []).flatMap((m) => (m.tasks || []).map((t) => t.id)))
-    data.direct_tasks = (data.tasks || []).filter((t) => !milestoneTaskIds.has(t.id))
+    const allTasks = data.tasks || []
+    for (const milestone of data.milestones || []) {
+      milestone.tasks = allTasks.filter((t) => t.milestone_id === milestone.id)
+    }
+    data.direct_tasks = allTasks.filter((t) => !t.milestone_id)
   }
   return data
 }
@@ -188,11 +195,26 @@ export async function updateMilestone(milestoneId, fields) {
 
 // Links an existing standalone task into a milestone (and therefore a project).
 // Existing tasks default to milestone_id = null, so this is opt-in.
+// Linking a task into a milestone now ALSO sets the task's project_id to
+// match the milestone's project — required by the database consistency
+// trigger (a task's milestone must belong to the same project as the
+// task itself). project_id is the single source of truth for project
+// membership; milestone_id is purely "which phase is this grouped under."
 export async function linkTaskToMilestone(taskId, milestoneId) {
-  const { error } = await supabase.from('tasks').update({ milestone_id: milestoneId }).eq('id', taskId)
+  const { data: milestone, error: milestoneErr } = await supabase
+    .from('milestones').select('project_id').eq('id', milestoneId).single()
+  if (milestoneErr) throw milestoneErr
+
+  const { error } = await supabase
+    .from('tasks')
+    .update({ milestone_id: milestoneId, project_id: milestone.project_id })
+    .eq('id', taskId)
   if (error) throw error
 }
 
+// Unlinking from a milestone clears milestone_id only — the task stays
+// linked to its project (project_id is untouched), it just becomes
+// "ungrouped" within that project rather than belonging to no project.
 export async function unlinkTaskFromMilestone(taskId) {
   const { error } = await supabase.from('tasks').update({ milestone_id: null }).eq('id', taskId)
   if (error) throw error

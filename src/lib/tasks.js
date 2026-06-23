@@ -132,7 +132,7 @@ export async function fetchTaskDetail(taskId) {
   return data
 }
 
-export async function createTask({ name, description, teamId, projectId, ownerId, assigneeId, targetDate, priority, subActions }) {
+export async function createTask({ name, description, teamId, projectId, milestoneId, ownerId, assigneeId, targetDate, priority, subActions }) {
   return withNetworkErrorHandling(async () => {
     const status = assigneeId && assigneeId !== ownerId ? 'pending_acceptance' : 'initiated'
 
@@ -143,6 +143,7 @@ export async function createTask({ name, description, teamId, projectId, ownerId
         description,
         team_id: teamId,
         project_id: projectId || null,
+        milestone_id: milestoneId || null,
         owner_id: ownerId,
         assignee_id: assigneeId || null,
         target_date: targetDate || null,

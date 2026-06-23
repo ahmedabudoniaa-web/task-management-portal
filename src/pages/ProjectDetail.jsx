@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, linkTaskToMilestone, archiveProject, cancelProject, closeProject, deleteProject } from '../lib/projects'
+import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, archiveProject, cancelProject, closeProject, deleteProject } from '../lib/projects'
 import { createTask, fetchTeams, fetchProfiles, fetchNotifications } from '../lib/tasks'
 import { requestStageAdvance, resolveStageAdvance } from '../lib/governance'
 import { supabase } from '../lib/supabase'
@@ -194,18 +194,18 @@ export default function ProjectDetail() {
     const form = phaseTaskForms[phase.id]
     if (!form?.name?.trim()) return
     runAction(async () => {
-      const task = await createTask({
+      await createTask({
         name: form.name,
         description: form.description || '',
         teamId: project.team_id,
         projectId: project.id,
+        milestoneId: phase.id,
         ownerId: profile.id,
         assigneeId: form.assigneeId || null,
         targetDate: form.targetDate || phase.planned_date || null,
         priority: form.priority || 'medium',
         subActions: [],
       })
-      await linkTaskToMilestone(task.id, phase.id)
       setPhaseTaskForms((forms) => ({ ...forms, [phase.id]: { name: '', description: '', assigneeId: profile.id, targetDate: '', priority: 'medium' } }))
       await load()
     })
