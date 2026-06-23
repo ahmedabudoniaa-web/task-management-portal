@@ -445,6 +445,7 @@ export default function ProjectDetail() {
                 <option value="in_progress">In progress</option>
                 <option value="blocked">Blocked</option>
                 <option value="done" disabled={!canMarkDone}>Done{!canMarkDone ? ` (${incompleteCount} task${incompleteCount === 1 ? '' : 's'} open)` : ''}</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
             <div style={styles.phaseProgressTrack}><div style={{ ...styles.phaseProgressFill, width: `${phase.percent_complete || 0}%` }} /></div>
