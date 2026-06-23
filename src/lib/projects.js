@@ -15,6 +15,7 @@ export async function fetchProjects({ profile, teamFilter }) {
       coordinator:profiles!projects_project_coordinator_id_fkey(id, full_name),
       milestones(id, percent_complete, status)
     `)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (!isMBM(profile)) {

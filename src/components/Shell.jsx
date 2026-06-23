@@ -105,14 +105,14 @@ export default function Shell({ children, teams, teamFilter, setTeamFilter, noti
           </div>
 
           <nav className="nav-scroll" style={styles.navGroup} aria-label="Main navigation">
-            <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onPortfolio && !onTeams && !onProjects && !onActions && !onGovernance && !onInbox && !onProfile ? styles.navLinkActive : {}) }}>
-              Tasks
-            </Link>
             <Link to="/portfolio" className="nav-link" style={{ ...styles.navLink, ...(onPortfolio ? styles.navLinkActive : {}) }}>
               Portfolio
             </Link>
             <Link to="/teams" className="nav-link" style={{ ...styles.navLink, ...(onTeams ? styles.navLinkActive : {}) }}>
-              Teams
+              Teams Dashboard
+            </Link>
+            <Link to="/" className="nav-link" style={{ ...styles.navLink, ...(!onPortfolio && !onTeams && !onProjects && !onActions && !onGovernance && !onInbox && !onProfile ? styles.navLinkActive : {}) }}>
+              Tasks
             </Link>
             <Link to="/projects" className="nav-link" style={{ ...styles.navLink, ...(onProjects ? styles.navLinkActive : {}) }}>
               Projects

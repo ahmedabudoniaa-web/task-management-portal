@@ -7,6 +7,7 @@ import { requestStageAdvance, resolveStageAdvance } from '../lib/governance'
 import { supabase } from '../lib/supabase'
 import { healthColor } from '../lib/teamColors'
 import Shell from '../components/Shell'
+import TaskDetail from '../components/TaskDetail'
 import AutoGrowTextarea from '../components/AutoGrowTextarea'
 
 const STATUS_FLOW = ['initiation', 'planning', 'execution', 'final_review', 'closure', 'closed']
@@ -23,6 +24,7 @@ export default function ProjectDetail() {
   const [project, setProject] = useState(null)
   const [teams, setTeams] = useState([])
   const [people, setPeople] = useState([])
+  const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -195,7 +197,7 @@ export default function ProjectDetail() {
     const form = phaseTaskForms[phase.id]
     if (!form?.name?.trim()) return
     runAction(async () => {
-      await createTask({
+      const created = await createTask({
         name: form.name,
         description: form.description || '',
         teamId: project.team_id,
@@ -209,6 +211,7 @@ export default function ProjectDetail() {
       })
       setPhaseTaskForms((forms) => ({ ...forms, [phase.id]: { name: '', description: '', assigneeId: profile.id, targetDate: '', priority: 'medium' } }))
       await load()
+      if (created?.id) setSelectedTaskId(created.id)
     })
   }
 
@@ -513,7 +516,7 @@ export default function ProjectDetail() {
             <div style={styles.phaseProgressTrack}><div style={{ ...styles.phaseProgressFill, width: `${phase.percent_complete || 0}%` }} /></div>
             <div style={styles.phaseTasks}>
               {phaseTasks.length === 0 && <p style={styles.emptySub}>No tasks in this phase yet.</p>}
-              {phaseTasks.map((t) => <div key={t.id} style={styles.phaseTaskRow}><span style={styles.phaseTaskName}>{t.name}</span><span style={styles.phaseTaskMeta}>{t.assignee?.full_name || 'Unassigned'} · {t.status}</span></div>)}
+              {phaseTasks.map((t) => <button key={t.id} type="button" onClick={() => setSelectedTaskId(t.id)} style={styles.phaseTaskRow}><span style={styles.phaseTaskName}>{t.name}</span><span style={styles.phaseTaskMeta}>{t.assignee?.full_name || 'Unassigned'} · {t.status?.replaceAll('_', ' ')}</span></button>)}
             </div>
             {canEdit && !isTerminal && (
               <form onSubmit={(e) => submitPhaseTask(e, phase)} style={styles.phaseTaskForm}>
@@ -542,10 +545,10 @@ export default function ProjectDetail() {
           </p>
           {project.direct_tasks.map((t) => (
             <div key={t.id} style={styles.directTaskRow}>
-              <span style={{ minWidth: 0 }}>
+              <button type="button" onClick={() => setSelectedTaskId(t.id)} style={styles.directTaskOpen}>
                 <span style={styles.directTaskName}>{t.name}</span>
                 <span style={styles.directTaskMeta}>{t.assignee?.full_name || 'Unassigned'} · {t.status?.replaceAll('_', ' ')}</span>
-              </span>
+              </button>
               {canEdit && !isTerminal && (project.milestones || []).length > 0 && (
                 <select
                   value=""
@@ -561,6 +564,16 @@ export default function ProjectDetail() {
             </div>
           ))}
         </>
+      )}
+
+      {selectedTaskId && (
+        <TaskDetail
+          taskId={selectedTaskId}
+          people={people}
+          allTasks={project?.tasks || []}
+          onClose={() => setSelectedTaskId(null)}
+          onChanged={() => { load() }}
+        />
       )}
     </Shell>
   )
@@ -641,11 +654,12 @@ const styles = {
   phaseProgressTrack: { height: 5, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden', marginBottom: 10 },
   phaseProgressFill: { height: '100%', background: 'var(--bupa-blue)' },
   phaseTasks: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 },
-  phaseTaskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: '8px 10px', gap: 10 },
+  phaseTaskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--surface-2)', borderRadius: 'var(--radius)', padding: '8px 10px', gap: 10, border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' },
   phaseTaskName: { fontSize: 13, fontWeight: 700, color: 'var(--text)' },
   phaseTaskMeta: { fontSize: 12, color: 'var(--text-3)' },
   phaseTaskForm: { display: 'grid', gridTemplateColumns: '1.4fr 1fr 0.9fr 0.8fr auto', gap: 8, alignItems: 'center', marginTop: 10 },
   directTaskRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, background: 'var(--surface)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 8, boxShadow: '0 1px 4px rgba(0,80,160,0.04)' },
+  directTaskOpen: { minWidth: 0, flex: 1, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', padding: 0 },
   directTaskName: { display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--text)' },
   directTaskMeta: { display: 'block', fontSize: 12, color: 'var(--text-3)', marginTop: 2, textTransform: 'capitalize' },
   directTaskHint: { fontSize: 12.5, color: 'var(--text-3)', margin: '0 0 12px', maxWidth: 620 },
