@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
 import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, linkTaskToMilestone } from '../lib/projects'
 import { createTask, fetchTeams, fetchProfiles, fetchNotifications } from '../lib/tasks'
+import { requestStageAdvance, resolveStageAdvance } from '../lib/governance'
+import { supabase } from '../lib/supabase'
 import { healthColor } from '../lib/teamColors'
 import Shell from '../components/Shell'
 import AutoGrowTextarea from '../components/AutoGrowTextarea'
@@ -33,6 +35,9 @@ export default function ProjectDetail() {
   const [phaseOwner, setPhaseOwner] = useState('')
   const [phaseDate, setPhaseDate] = useState('')
   const [phaseTaskForms, setPhaseTaskForms] = useState({})
+  const [pendingStageRequest, setPendingStageRequest] = useState(null)
+  const [showAdvanceForm, setShowAdvanceForm] = useState(false)
+  const [advanceNote, setAdvanceNote] = useState('')
 
   async function load() {
     setLoading(true)
@@ -48,6 +53,16 @@ export default function ProjectDetail() {
       setTeams(tm)
       setPeople(ppl)
       setNotifications(n)
+
+      const { data: pendingReq } = await supabase
+        .from('stage_advance_requests')
+        .select('*, requester:profiles!stage_advance_requests_requested_by_fkey(id, full_name)')
+        .eq('project_id', projectId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      setPendingStageRequest(pendingReq || null)
     } catch (err) {
       setLoadError(err.message || 'Could not load this project.')
     } finally {
@@ -76,6 +91,32 @@ export default function ProjectDetail() {
       await updateProjectHealth({ projectId: project.id, newHealth, oldHealth: project.health, reason: healthReason, changedBy: profile.id })
       setShowHealthForm(false)
       setHealthReason('')
+      await load()
+    })
+  }
+
+  function submitAdvanceRequest(e) {
+    e.preventDefault()
+    const idx = STATUS_FLOW.indexOf(project.status)
+    const next = STATUS_FLOW[idx + 1]
+    if (!next) return
+    runAction(async () => {
+      await requestStageAdvance({
+        projectId: project.id, requestedBy: profile.id,
+        fromStatus: project.status, toStatus: next, note: advanceNote,
+      })
+      setShowAdvanceForm(false)
+      setAdvanceNote('')
+      await load()
+    })
+  }
+
+  function handleResolveAdvance(approve) {
+    runAction(async () => {
+      await resolveStageAdvance({
+        requestId: pendingStageRequest.id, approve, resolverId: profile.id,
+        projectId: project.id, toStatus: pendingStageRequest.to_status,
+      })
       await load()
     })
   }
@@ -154,6 +195,10 @@ export default function ProjectDetail() {
   const isPM = project.project_manager_id === profile.id
   const isSponsor = project.sponsor_id === profile.id
   const canEdit = profile.is_mbm || isPM || isSponsor
+  // Per the original design: the PM requests a stage advance, and either
+  // the sponsor or MBM approves it — not the PM themselves.
+  const canApproveStage = profile.is_mbm || isSponsor
+  const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(project.status) + 1]
 
   return (
     <Shell teams={teams} teamFilter={null} setTeamFilter={() => {}} notifCount={unreadCount} onBellClick={() => {}}>
@@ -190,10 +235,51 @@ export default function ProjectDetail() {
           <InfoBox title="Success criteria" text={project.success_criteria} />
         </div>
 
+        {pendingStageRequest && (
+          <div style={styles.pendingStageBox}>
+            <p style={styles.pendingStageTitle}>
+              Stage advance requested: {STATUS_LABELS[pendingStageRequest.from_status]} → {STATUS_LABELS[pendingStageRequest.to_status]}
+            </p>
+            <p style={styles.pendingStageDetail}>
+              Requested by {pendingStageRequest.requester?.full_name}
+              {typeof pendingStageRequest.milestone_completion_snapshot === 'number'
+                ? ` · phases ${pendingStageRequest.milestone_completion_snapshot}% complete at time of request`
+                : ''}
+              {pendingStageRequest.note ? ` — "${pendingStageRequest.note}"` : ''}
+            </p>
+            {canApproveStage ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => handleResolveAdvance(true)} disabled={busy} style={styles.smallBtn}>Approve advance</button>
+                <button onClick={() => handleResolveAdvance(false)} disabled={busy} style={styles.smallBtnOutline}>Decline</button>
+              </div>
+            ) : (
+              <p style={styles.waitingText}>Waiting on sponsor or MBM approval.</p>
+            )}
+          </div>
+        )}
+
         {canEdit && (
           <div style={styles.actionRow}>
+            {nextStatus && !pendingStageRequest && (
+              <button onClick={() => setShowAdvanceForm(true)} disabled={busy} style={styles.smallBtn}>
+                Request advance to {STATUS_LABELS[nextStatus]}
+              </button>
+            )}
             <button onClick={() => { setShowHealthForm(true); setNewHealth(project.health) }} disabled={busy} style={styles.smallBtnOutline}>Update health status</button>
           </div>
+        )}
+
+        {showAdvanceForm && (
+          <form onSubmit={submitAdvanceRequest} style={styles.healthForm}>
+            <AutoGrowTextarea
+              value={advanceNote} onChange={(e) => setAdvanceNote(e.target.value)}
+              placeholder="Optional note for the approver" style={styles.textarea}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="submit" disabled={busy} style={styles.smallBtn}>{busy ? 'Sending…' : 'Send request'}</button>
+              <button type="button" onClick={() => setShowAdvanceForm(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
+            </div>
+          </form>
         )}
 
         {showHealthForm && (
@@ -299,6 +385,10 @@ const styles = {
   infoTitle: { fontSize: 11.5, fontWeight: 800, color: 'var(--text-3)', textTransform: 'uppercase', margin: '0 0 6px' },
   infoText: { fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5, margin: 0, whiteSpace: 'pre-wrap' },
   actionRow: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  pendingStageBox: { background: 'var(--warning-light)', borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 16 },
+  pendingStageTitle: { fontSize: 13, fontWeight: 700, color: 'var(--warning)', margin: '0 0 4px' },
+  pendingStageDetail: { fontSize: 12.5, color: 'var(--warning)', margin: '0 0 10px', lineHeight: 1.5 },
+  waitingText: { fontSize: 12, color: 'var(--warning)', margin: 0, fontStyle: 'italic' },
   healthForm: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14, padding: 14, background: 'var(--surface-2)', borderRadius: 'var(--radius)' },
   healthOption: { flex: 1, fontSize: 12.5, fontWeight: 700, padding: '8px 0', borderRadius: 'var(--radius)', border: '2px solid transparent' },
   textarea: { fontSize: 13, padding: '9px 11px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: '#fff', minHeight: 56, fontFamily: 'inherit', resize: 'vertical' },
