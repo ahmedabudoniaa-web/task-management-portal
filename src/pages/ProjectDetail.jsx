@@ -6,6 +6,7 @@ import { createTask, moveTaskToPhase, fetchTeams, fetchProfiles, fetchNotificati
 import { requestStageAdvance, resolveStageAdvance } from '../lib/governance'
 import { supabase } from '../lib/supabase'
 import { healthColor } from '../lib/teamColors'
+import { peopleVisibleForTeam } from '../lib/permissions'
 import Shell from '../components/Shell'
 import TaskDetail from '../components/TaskDetail'
 import AutoGrowTextarea from '../components/AutoGrowTextarea'
@@ -481,7 +482,7 @@ export default function ProjectDetail() {
         <form onSubmit={submitPhase} style={styles.phaseForm}>
           <input value={phaseName} onChange={(e) => setPhaseName(e.target.value)} placeholder="Phase name" required style={styles.input} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <select value={phaseOwner} onChange={(e) => setPhaseOwner(e.target.value)} style={{ ...styles.input, flex: 1 }}><option value="">Unassigned</option>{people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
+            <select value={phaseOwner} onChange={(e) => setPhaseOwner(e.target.value)} style={{ ...styles.input, flex: 1 }}><option value="">Unassigned</option>{peopleVisibleForTeam(profile, people, project.team_id).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
             <input type="date" value={phaseDate} onChange={(e) => setPhaseDate(e.target.value)} style={{ ...styles.input, flex: 1 }} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}><button type="submit" disabled={busy} style={styles.smallBtn}>Add phase</button><button type="button" onClick={() => setShowPhaseForm(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button></div>
@@ -521,7 +522,7 @@ export default function ProjectDetail() {
             {canEdit && !isTerminal && (
               <form onSubmit={(e) => submitPhaseTask(e, phase)} style={styles.phaseTaskForm}>
                 <input value={form.name} onChange={(e) => updatePhaseTaskForm(phase.id, 'name', e.target.value)} placeholder="Add task under this phase" style={{ ...styles.input, flex: 1 }} />
-                <select value={form.assigneeId} onChange={(e) => updatePhaseTaskForm(phase.id, 'assigneeId', e.target.value)} style={styles.input}><option value="">Unassigned</option>{people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
+                <select value={form.assigneeId} onChange={(e) => updatePhaseTaskForm(phase.id, 'assigneeId', e.target.value)} style={styles.input}><option value="">Unassigned</option>{peopleVisibleForTeam(profile, people, project.team_id).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
                 <select value={form.priority} onChange={(e) => updatePhaseTaskForm(phase.id, 'priority', e.target.value)} style={styles.input} title="Priority">
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>

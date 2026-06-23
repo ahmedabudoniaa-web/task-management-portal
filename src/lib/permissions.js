@@ -50,9 +50,13 @@ export function availableTeamsForCreation(profile, teams = []) {
 }
 
 export function peopleVisibleForTeam(profile, people = [], teamId) {
-  // Cross-function assignment: anyone can assign a task to anyone else,
-  // regardless of team. No filtering by team or management chain.
-  return people
+  // You can assign to / filter by yourself and anyone in your management
+  // chain (direct + indirect reports). MBM sees everyone. This is what drives
+  // "see only the people I manage" across assignee pickers and the team-tasks
+  // filter; the managed list comes from the manager_id hierarchy.
+  if (isMBM(profile)) return people
+  const managed = new Set(managedProfileIds(profile))
+  return people.filter((p) => p.id === profile?.id || managed.has(p.id))
 }
 
 export function canManagePerson(profile, personId) {
