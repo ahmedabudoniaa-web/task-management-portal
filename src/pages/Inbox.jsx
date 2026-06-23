@@ -5,6 +5,7 @@ import { fetchMailbox, sendTeamMessage, markMessageRead } from '../lib/messages'
 import Shell from '../components/Shell'
 import NotificationsPanel from '../components/NotificationsPanel'
 import TaskDetail from '../components/TaskDetail'
+import AutoGrowTextarea from '../components/AutoGrowTextarea'
 
 function initials(name) {
   return (name || '?').split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()
@@ -151,7 +152,7 @@ export default function Inbox() {
               {people.filter((p) => p.id !== profile.id).map((p) => <option key={p.id} value={p.id}>{p.full_name} {p.team?.name ? `· ${p.team.name}` : ''}</option>)}
             </select>
             <input value={subject} onChange={(e) => setSubject(e.target.value)} style={styles.input} placeholder="Subject" />
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} style={styles.textarea} placeholder="Write your message…" />
+            <AutoGrowTextarea value={body} onChange={(e) => setBody(e.target.value)} style={styles.textarea} placeholder="Write your message…" />
             {error && <p style={styles.error}>{error}</p>}
             <button type="submit" disabled={saving} style={styles.primaryBtn}>{saving ? 'Sending…' : 'Send message'}</button>
           </form>
@@ -192,7 +193,7 @@ export default function Inbox() {
               </div>
 
               <form onSubmit={submitReply} style={styles.replyBox}>
-                <textarea value={replyBody} onChange={(e) => setReplyBody(e.target.value)} placeholder="Reply to this conversation…" style={styles.replyInput} />
+                <AutoGrowTextarea value={replyBody} onChange={(e) => setReplyBody(e.target.value)} placeholder="Reply to this conversation…" style={styles.replyInput} />
                 <button type="submit" disabled={saving || !replyBody.trim()} style={styles.replyBtn}>{saving ? 'Sending…' : 'Reply'}</button>
               </form>
             </>

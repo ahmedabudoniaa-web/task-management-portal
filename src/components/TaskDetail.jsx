@@ -8,6 +8,7 @@ import {
 } from '../lib/tasks'
 import { fetchTaskDependencies, addDependency, removeDependency, getMentionSuggestions, insertMention } from '../lib/dependencies'
 import MentionText from './MentionText'
+import AutoGrowTextarea from './AutoGrowTextarea'
 
 export default function TaskDetail({ taskId, people, allTasks, onClose, onChanged }) {
   const { profile } = useAuth()
@@ -553,7 +554,7 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
         {showSubForm && (
           <form onSubmit={submitSubAction} style={styles.subForm}>
             <input value={subName} onChange={(e) => setSubName(e.target.value)} placeholder="Action name" required style={styles.input} />
-            <textarea value={subDescription} onChange={(e) => setSubDescription(e.target.value)} placeholder="Description (optional)" style={styles.textarea} />
+            <AutoGrowTextarea value={subDescription} onChange={(e) => setSubDescription(e.target.value)} placeholder="Description (optional)" style={styles.textarea} />
             <div style={{ display: 'flex', gap: 8 }}>
               <input type="date" value={subDeadline} onChange={(e) => setSubDeadline(e.target.value)} style={{ ...styles.input, flex: 1 }} />
               <select value={subAssignee} onChange={(e) => setSubAssignee(e.target.value)} style={{ ...styles.input, flex: 1 }}>

@@ -8,6 +8,7 @@ import { fetchProjects } from '../lib/projects'
 import Shell from '../components/Shell'
 import RiskBadge from '../components/RiskBadge'
 import NotificationsPanel from '../components/NotificationsPanel'
+import AutoGrowTextarea from '../components/AutoGrowTextarea'
 
 const TABS = [
   { key: 'risks', label: 'Risks' },
@@ -284,12 +285,12 @@ function NewRiskForm({ teams, people, projects, profile, busy, runAction, onDone
 
   return (
     <form onSubmit={submit} style={styles.formCard}>
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="Risk description" style={styles.textarea} />
+      <AutoGrowTextarea value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="Risk description" style={styles.textarea} />
       <div style={styles.formRow}>
         <select value={impact} onChange={(e) => setImpact(e.target.value)} style={styles.input}><option value="low">Low impact</option><option value="medium">Medium impact</option><option value="high">High impact</option></select>
         <select value={likelihood} onChange={(e) => setLikelihood(e.target.value)} style={styles.input}><option value="low">Low likelihood</option><option value="medium">Medium likelihood</option><option value="high">High likelihood</option></select>
       </div>
-      <textarea value={mitigationPlan} onChange={(e) => setMitigationPlan(e.target.value)} placeholder="Mitigation plan (optional)" style={{ ...styles.textarea, minHeight: 50 }} />
+      <AutoGrowTextarea value={mitigationPlan} onChange={(e) => setMitigationPlan(e.target.value)} placeholder="Mitigation plan (optional)" style={{ ...styles.textarea, minHeight: 50 }} />
       <div style={styles.formRow}>
         <select value={teamId} onChange={(e) => setTeamId(e.target.value)} style={styles.input}>{teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
         <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} style={styles.input}><option value="">Unassigned owner</option>{people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
@@ -320,8 +321,8 @@ function NewIssueForm({ teams, people, projects, profile, busy, runAction, onDon
 
   return (
     <form onSubmit={submit} style={styles.formCard}>
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="Issue description" style={styles.textarea} />
-      <textarea value={resolutionPlan} onChange={(e) => setResolutionPlan(e.target.value)} placeholder="Resolution plan (optional)" style={{ ...styles.textarea, minHeight: 50 }} />
+      <AutoGrowTextarea value={description} onChange={(e) => setDescription(e.target.value)} required placeholder="Issue description" style={styles.textarea} />
+      <AutoGrowTextarea value={resolutionPlan} onChange={(e) => setResolutionPlan(e.target.value)} placeholder="Resolution plan (optional)" style={{ ...styles.textarea, minHeight: 50 }} />
       <div style={styles.formRow}>
         <select value={teamId} onChange={(e) => setTeamId(e.target.value)} style={styles.input}>{teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
         <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} style={styles.input}><option value="">Unassigned owner</option>{people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>
@@ -353,9 +354,9 @@ function NewDecisionForm({ teams, people, projects, profile, busy, runAction, on
 
   return (
     <form onSubmit={submit} style={styles.formCard}>
-      <textarea value={decision} onChange={(e) => setDecision(e.target.value)} required placeholder="Decision (e.g. Vendor selection approved)" style={styles.textarea} />
-      <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (optional)" style={{ ...styles.textarea, minHeight: 50 }} />
-      <textarea value={impact} onChange={(e) => setImpact(e.target.value)} placeholder="Impact (optional)" style={{ ...styles.textarea, minHeight: 50 }} />
+      <AutoGrowTextarea value={decision} onChange={(e) => setDecision(e.target.value)} required placeholder="Decision (e.g. Vendor selection approved)" style={styles.textarea} />
+      <AutoGrowTextarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (optional)" style={{ ...styles.textarea, minHeight: 50 }} />
+      <AutoGrowTextarea value={impact} onChange={(e) => setImpact(e.target.value)} placeholder="Impact (optional)" style={{ ...styles.textarea, minHeight: 50 }} />
       <div style={styles.formRow}>
         <select value={teamId} onChange={(e) => setTeamId(e.target.value)} style={styles.input}>{teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
         <select value={decisionOwnerId} onChange={(e) => setDecisionOwnerId(e.target.value)} style={styles.input}><option value="">Unassigned owner</option>{people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}</select>

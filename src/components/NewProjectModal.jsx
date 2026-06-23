@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createProject } from '../lib/projects'
 import { useAuth } from '../lib/AuthContext'
 import { availableTeamsForCreation, peopleVisibleForTeam } from '../lib/permissions'
+import AutoGrowTextarea from './AutoGrowTextarea'
 
 export default function NewProjectModal({ teams, people, onClose, onCreated }) {
   const { profile } = useAuth()
@@ -84,22 +85,22 @@ export default function NewProjectModal({ teams, people, onClose, onCreated }) {
 
           <label style={styles.label}>
             Strategic objective
-            <textarea value={strategicObjective} onChange={(e) => setStrategicObjective(e.target.value)} style={styles.textarea} placeholder="What strategic goal does this support" />
+            <AutoGrowTextarea value={strategicObjective} onChange={(e) => setStrategicObjective(e.target.value)} style={styles.textarea} placeholder="What strategic goal does this support" />
           </label>
 
           <label style={styles.label}>
             Business justification
-            <textarea value={businessJustification} onChange={(e) => setBusinessJustification(e.target.value)} style={styles.textarea} placeholder="Why this project, why now" />
+            <AutoGrowTextarea value={businessJustification} onChange={(e) => setBusinessJustification(e.target.value)} style={styles.textarea} placeholder="Why this project, why now" />
           </label>
 
           <div style={styles.row}>
             <label style={styles.label}>
               Expected outcome
-              <textarea value={expectedOutcome} onChange={(e) => setExpectedOutcome(e.target.value)} style={{ ...styles.textarea, minHeight: 56 }} />
+              <AutoGrowTextarea value={expectedOutcome} onChange={(e) => setExpectedOutcome(e.target.value)} style={{ ...styles.textarea, minHeight: 56 }} />
             </label>
             <label style={styles.label}>
               Success criteria
-              <textarea value={successCriteria} onChange={(e) => setSuccessCriteria(e.target.value)} style={{ ...styles.textarea, minHeight: 56 }} />
+              <AutoGrowTextarea value={successCriteria} onChange={(e) => setSuccessCriteria(e.target.value)} style={{ ...styles.textarea, minHeight: 56 }} />
             </label>
           </div>
 

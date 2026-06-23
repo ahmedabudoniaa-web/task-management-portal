@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createTask } from '../lib/tasks'
 import { useAuth } from '../lib/AuthContext'
 import { availableTeamsForCreation, isMBM, isDirector, peopleVisibleForTeam } from '../lib/permissions'
+import AutoGrowTextarea from './AutoGrowTextarea'
 
 export default function NewTaskModal({ teams, people, projects, onClose, onCreated }) {
   const { profile } = useAuth()
@@ -75,7 +76,7 @@ export default function NewTaskModal({ teams, people, projects, onClose, onCreat
 
           <label style={styles.labelWide}>
             Description / first action
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} style={styles.textarea} placeholder="What needs to happen" />
+            <AutoGrowTextarea value={description} onChange={(e) => setDescription(e.target.value)} style={styles.textarea} placeholder="What needs to happen" />
           </label>
 
           <div style={styles.grid2}>

@@ -5,6 +5,7 @@ import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilesto
 import { createTask, fetchTeams, fetchProfiles, fetchNotifications } from '../lib/tasks'
 import { healthColor } from '../lib/teamColors'
 import Shell from '../components/Shell'
+import AutoGrowTextarea from '../components/AutoGrowTextarea'
 
 const STATUS_FLOW = ['initiation', 'planning', 'execution', 'final_review', 'closure', 'closed']
 const STATUS_LABELS = {
@@ -203,7 +204,7 @@ export default function ProjectDetail() {
                 return <button key={opt} type="button" onClick={() => setNewHealth(opt)} style={{ ...styles.healthOption, background: newHealth === opt ? oc.bg : 'var(--surface-2)', color: newHealth === opt ? oc.text : 'var(--text-2)', borderColor: newHealth === opt ? oc.text : 'transparent' }}>{oc.label}</button>
               })}
             </div>
-            <textarea value={healthReason} onChange={(e) => setHealthReason(e.target.value)} required placeholder="Reason for this status" style={styles.textarea} />
+            <AutoGrowTextarea value={healthReason} onChange={(e) => setHealthReason(e.target.value)} required placeholder="Reason for this status" style={styles.textarea} />
             <div style={{ display: 'flex', gap: 8 }}><button type="submit" disabled={busy} style={styles.smallBtn}>Save</button><button type="button" onClick={() => setShowHealthForm(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button></div>
           </form>
         )}
