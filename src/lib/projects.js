@@ -76,6 +76,7 @@ export async function fetchProjectDetail(projectId) {
       project_manager:profiles!projects_project_manager_id_fkey(id, full_name),
       coordinator:profiles!projects_project_coordinator_id_fkey(id, full_name),
       project_teams(id, team_id, role, team:teams(id, name)),
+      member_exclusions:project_member_exclusions(id, user_id),
       milestones(*, owner:profiles!milestones_owner_id_fkey(id, full_name)),
       project_health_log(*, changer:profiles(id, full_name)),
       tasks(id, name, status, priority, target_date, percent_complete, milestone_id,
@@ -157,6 +158,24 @@ export async function removeProjectTeam({ id, projectId, actorId }) {
   const { error } = await supabase.from('project_teams').delete().eq('id', id)
   if (error) throw error
   await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'team_removed', detail: 'Team removed' })
+}
+
+// ---------- PROJECT MEMBER EXCLUSIONS ----------
+// Members are derived from the owning + linked teams. Excluding a person
+// removes them from THIS project only — they lose view + add access via the
+// project_member_exclusions table (checked inside is_project_member()).
+export async function excludeProjectMember({ projectId, userId, actorId }) {
+  const { error } = await supabase
+    .from('project_member_exclusions')
+    .insert({ project_id: projectId, user_id: userId, excluded_by: actorId })
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'member_removed', detail: 'Member removed from project' })
+}
+
+export async function includeProjectMember({ exclusionId, projectId, actorId }) {
+  const { error } = await supabase.from('project_member_exclusions').delete().eq('id', exclusionId)
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'member_readded', detail: 'Member re-added to project' })
 }
 
 // ---------- PROJECT LIFECYCLE: archive, cancel, close, soft-delete ----------

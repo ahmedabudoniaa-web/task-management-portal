@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, archiveProject, cancelProject, closeProject, deleteProject, addProjectTeam, removeProjectTeam, updateProjectDetails } from '../lib/projects'
+import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, archiveProject, cancelProject, closeProject, deleteProject, addProjectTeam, removeProjectTeam, updateProjectDetails, excludeProjectMember, includeProjectMember } from '../lib/projects'
 import { createTask, moveTaskToPhase, fetchTeams, fetchProfiles, fetchNotifications } from '../lib/tasks'
 import { requestStageAdvance, resolveStageAdvance } from '../lib/governance'
 import { supabase } from '../lib/supabase'
@@ -136,6 +136,20 @@ export default function ProjectDetail() {
   function handleArchive() {
     runAction(async () => {
       await archiveProject(project.id, profile.id)
+      await load()
+    })
+  }
+
+  function handleExcludeMember(userId) {
+    runAction(async () => {
+      await excludeProjectMember({ projectId: project.id, userId, actorId: profile.id })
+      await load()
+    })
+  }
+
+  function handleIncludeMember(exclusionId) {
+    runAction(async () => {
+      await includeProjectMember({ exclusionId, projectId: project.id, actorId: profile.id })
       await load()
     })
   }
@@ -317,9 +331,14 @@ export default function ProjectDetail() {
   // Project membership = anyone on the owning team or any linked team
   // (coordinator / supporting / etc.). Members can view and add tasks.
   const projectTeamIds = [project.team_id, ...(project.project_teams || []).map((pt) => pt.team_id)].filter(Boolean)
-  const isProjectMember = projectTeamIds.includes(profile.team_id)
+  const excludedIds = new Set((project.member_exclusions || []).map((e) => e.user_id))
+  const exclusionByUser = Object.fromEntries((project.member_exclusions || []).map((e) => [e.user_id, e.id]))
+  const roleHolderIds = new Set([project.project_manager_id, project.sponsor_id, project.project_coordinator_id, project.created_by].filter(Boolean))
+  const teamMembers = (people || []).filter((p) => projectTeamIds.includes(p.team_id))
+  const projectMembers = teamMembers.filter((p) => !excludedIds.has(p.id))
+  const excludedMembers = teamMembers.filter((p) => excludedIds.has(p.id))
+  const isProjectMember = projectTeamIds.includes(profile.team_id) && !excludedIds.has(profile.id)
   const canAddTasks = canEdit || isProjectMember
-  const projectMembers = (people || []).filter((p) => projectTeamIds.includes(p.team_id))
   const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(project.status) + 1]
 
   return (
@@ -503,9 +522,27 @@ export default function ProjectDetail() {
             {projectMembers.map((m) => (
               <span key={m.id} style={styles.memberChip} title={m.team?.name || ''}>
                 <i className="ti ti-user" style={{ fontSize: 13 }} aria-hidden="true" /> {m.full_name}
+                {canEdit && !isTerminal && !roleHolderIds.has(m.id) && (
+                  <button onClick={() => handleExcludeMember(m.id)} disabled={busy} style={styles.teamChipRemove} title="Remove from project" aria-label={`Remove ${m.full_name}`}>×</button>
+                )}
               </span>
             ))}
           </div>
+          {excludedMembers.length > 0 && (
+            <>
+              <p style={styles.removedLabel}>Removed from this project</p>
+              <div style={styles.teamChips}>
+                {excludedMembers.map((m) => (
+                  <span key={m.id} style={styles.memberChipRemoved} title={m.team?.name || ''}>
+                    <i className="ti ti-user-off" style={{ fontSize: 13 }} aria-hidden="true" /> {m.full_name}
+                    {canEdit && !isTerminal && (
+                      <button onClick={() => handleIncludeMember(exclusionByUser[m.id])} disabled={busy} style={styles.readdBtn} title="Re-add to project">Re-add</button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {pendingStageRequest && (
@@ -780,6 +817,9 @@ const styles = {
   membersHint: { fontSize: 11.5, color: 'var(--text-3)', margin: '0 0 10px' },
   membersEmpty: { fontSize: 12.5, color: 'var(--text-3)' },
   memberChip: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, borderRadius: 999, padding: '5px 11px', background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)' },
+  memberChipRemoved: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, borderRadius: 999, padding: '5px 11px', background: 'transparent', color: 'var(--text-3)', border: '1px dashed var(--border)', textDecoration: 'line-through' },
+  removedLabel: { fontSize: 11.5, color: 'var(--text-3)', margin: '12px 0 8px', fontWeight: 700 },
+  readdBtn: { border: 'none', background: 'var(--info-light)', color: 'var(--info)', borderRadius: 999, padding: '2px 9px', fontSize: 11, fontWeight: 800, cursor: 'pointer', marginLeft: 3, textDecoration: 'none' },
   teamChip: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, borderRadius: 999, padding: '5px 11px', background: 'var(--surface-2)', color: 'var(--text-2)' },
   teamChipRemove: { border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 15, lineHeight: 1, cursor: 'pointer', padding: 0, marginLeft: 2 },
   addTeamForm: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
