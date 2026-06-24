@@ -13,7 +13,7 @@ export async function fetchProjects({ profile, teamFilter }) {
       sponsor:profiles!projects_sponsor_id_fkey(id, full_name),
       project_manager:profiles!projects_project_manager_id_fkey(id, full_name),
       coordinator:profiles!projects_project_coordinator_id_fkey(id, full_name),
-      milestones(id, percent_complete, status)
+      milestones(id, name, sort_order, percent_complete, status)
     `)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
@@ -132,6 +132,14 @@ export async function createProject({
 export async function updateProjectStatus(projectId, status) {
   const { error } = await supabase.from('projects').update({ status }).eq('id', projectId)
   if (error) throw error
+}
+
+// Owner / PM / MBM edit of core project details. Allowed by the existing
+// "project update" RLS policy; the audit entry records who changed what.
+export async function updateProjectDetails({ projectId, fields, actorId }) {
+  const { error } = await supabase.from('projects').update(fields).eq('id', projectId)
+  if (error) throw error
+  await logAudit({ entityType: 'project', entityId: projectId, actorId, action: 'updated', detail: 'Project details updated' })
 }
 
 // ---------- MULTI-TEAM (audit §8 / Finding 7.1) ----------

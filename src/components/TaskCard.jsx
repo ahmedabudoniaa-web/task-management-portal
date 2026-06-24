@@ -1,13 +1,28 @@
 import { StatusBadge, PriorityBadge } from './Badges'
 import { teamColor, teamIcon } from '../lib/teamColors'
 
+// Date-only comparison so a task due *today* isn't wrongly flagged overdue
+// the moment the clock passes midnight-relative time. Returns a short label
+// for the soon/overdue states the cards highlight.
+function dueInfo(targetDate, status) {
+  if (!targetDate || status === 'completed' || status === 'cancelled') return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const d = new Date(targetDate); d.setHours(0, 0, 0, 0)
+  const days = Math.round((d - today) / 86400000)
+  if (days < 0) return { label: 'Overdue', kind: 'overdue' }
+  if (days === 0) return { label: 'Due today', kind: 'soon' }
+  if (days === 1) return { label: 'Due tomorrow', kind: 'soon' }
+  return null
+}
+
 export default function TaskCard({ task, onClick }) {
   const subDone = task.sub_actions?.filter((s) => s.status === 'done').length || 0
   const subTotal = task.sub_actions?.length || 0
   const visibleSubs = (task.sub_actions || []).slice(0, 3)
   const c = teamColor(task.team?.name)
   const icon = teamIcon(task.team?.name)
-  const isDelayed = task.status !== 'completed' && task.target_date && new Date(task.target_date) < new Date()
+  const due = dueInfo(task.target_date, task.status)
+  const isDelayed = due?.kind === 'overdue'
 
   return (
     <button onClick={onClick} className="task-card" style={{ ...styles.card, background: isDelayed ? 'var(--danger-light)' : c.card }}>
@@ -26,6 +41,7 @@ export default function TaskCard({ task, onClick }) {
               {task.project?.name && <p style={styles.projectName}>{task.project.name}</p>}
             </div>
             <div style={styles.badges}>
+              {due && <span style={due.kind === 'overdue' ? styles.dueOverdue : styles.dueSoon}>⏰ {due.label}</span>}
               <StatusBadge status={task.status} isDelayed={isDelayed} />
               <PriorityBadge priority={task.priority} />
             </div>
@@ -69,6 +85,8 @@ const styles = {
   name: { fontSize: 14.5, fontWeight: 800, margin: 0, color: 'var(--text)', lineHeight: 1.35 },
   projectName: { fontSize: 11.5, color: 'var(--text-3)', margin: '2px 0 0' },
   badges: { display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  dueOverdue: { fontSize: 11, fontWeight: 800, color: '#fff', background: 'var(--danger)', padding: '3px 8px', borderRadius: 999, whiteSpace: 'nowrap' },
+  dueSoon: { fontSize: 11, fontWeight: 800, color: 'var(--danger)', background: 'var(--danger-light)', border: '1px solid var(--danger)', padding: '2px 8px', borderRadius: 999, whiteSpace: 'nowrap' },
   metaRow: { display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' },
   metaItem: { fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 5 },
   dot: { width: 7, height: 7, borderRadius: '50%', display: 'inline-block' },

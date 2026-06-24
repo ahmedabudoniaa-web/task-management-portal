@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/AuthContext'
-import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, archiveProject, cancelProject, closeProject, deleteProject, addProjectTeam, removeProjectTeam } from '../lib/projects'
+import { fetchProjectDetail, updateProjectHealth, createMilestone, updateMilestone, archiveProject, cancelProject, closeProject, deleteProject, addProjectTeam, removeProjectTeam, updateProjectDetails } from '../lib/projects'
 import { createTask, moveTaskToPhase, fetchTeams, fetchProfiles, fetchNotifications } from '../lib/tasks'
 import { requestStageAdvance, resolveStageAdvance } from '../lib/governance'
 import { supabase } from '../lib/supabase'
@@ -47,6 +47,8 @@ export default function ProjectDetail() {
   const [advanceNote, setAdvanceNote] = useState('')
   const [showLifecycleMenu, setShowLifecycleMenu] = useState(false)
   const [confirmingAction, setConfirmingAction] = useState(null) // 'cancel' | 'delete' | 'close' | null
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState(null)
   const [lifecycleReason, setLifecycleReason] = useState('')
 
   async function load() {
@@ -134,6 +136,41 @@ export default function ProjectDetail() {
   function handleArchive() {
     runAction(async () => {
       await archiveProject(project.id, profile.id)
+      await load()
+    })
+  }
+
+  function startEdit() {
+    setEditForm({
+      name: project.name || '',
+      start_date: project.start_date || '',
+      target_completion_date: project.target_completion_date || '',
+      strategic_objective: project.strategic_objective || '',
+      business_justification: project.business_justification || '',
+      expected_outcome: project.expected_outcome || '',
+      success_criteria: project.success_criteria || '',
+    })
+    setEditing(true)
+  }
+
+  function saveEdit(e) {
+    e.preventDefault()
+    if (!editForm.name.trim()) return
+    runAction(async () => {
+      await updateProjectDetails({
+        projectId: project.id,
+        actorId: profile.id,
+        fields: {
+          name: editForm.name.trim(),
+          start_date: editForm.start_date || null,
+          target_completion_date: editForm.target_completion_date || null,
+          strategic_objective: editForm.strategic_objective || null,
+          business_justification: editForm.business_justification || null,
+          expected_outcome: editForm.expected_outcome || null,
+          success_criteria: editForm.success_criteria || null,
+        },
+      })
+      setEditing(false)
       await load()
     })
   }
@@ -277,6 +314,12 @@ export default function ProjectDetail() {
   const isOwner = project.created_by === profile.id
   const canManageLifecycle = profile.is_mbm || isPM || isOwner
   const isTerminal = ['closed', 'cancelled', 'archived'].includes(project.status)
+  // Project membership = anyone on the owning team or any linked team
+  // (coordinator / supporting / etc.). Members can view and add tasks.
+  const projectTeamIds = [project.team_id, ...(project.project_teams || []).map((pt) => pt.team_id)].filter(Boolean)
+  const isProjectMember = projectTeamIds.includes(profile.team_id)
+  const canAddTasks = canEdit || isProjectMember
+  const projectMembers = (people || []).filter((p) => projectTeamIds.includes(p.team_id))
   const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(project.status) + 1]
 
   return (
@@ -295,6 +338,11 @@ export default function ProjectDetail() {
             <button onClick={() => navigate(`/projects/${project.id}/dashboard`)} style={styles.dashboardLinkBtn}>
               <i className="ti ti-chart-donut" style={{ fontSize: 14 }} aria-hidden="true" /> Dashboard
             </button>
+            {canManageLifecycle && !isTerminal && !editing && (
+              <button onClick={startEdit} style={styles.dashboardLinkBtn}>
+                <i className="ti ti-edit" style={{ fontSize: 14 }} aria-hidden="true" /> Edit details
+              </button>
+            )}
             <span style={{ ...styles.healthBadge, background: h.bg, color: h.text }}><span style={{ ...styles.healthDot, background: h.text }} />{h.label}</span>
             {canManageLifecycle && project.status !== 'archived' && (
               <div style={{ position: 'relative' }}>
@@ -362,6 +410,39 @@ export default function ProjectDetail() {
           </div>
         )}
 
+        {editing && editForm && (
+          <form onSubmit={saveEdit} style={styles.editBox}>
+            <p style={styles.editTitle}>Edit project details</p>
+            <label style={styles.editLabel}>Project name
+              <input value={editForm.name} onChange={(e) => setEditForm((s) => ({ ...s, name: e.target.value }))} style={styles.input} />
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <label style={styles.editLabel}>Start date
+                <input type="date" value={editForm.start_date || ''} onChange={(e) => setEditForm((s) => ({ ...s, start_date: e.target.value }))} style={styles.input} />
+              </label>
+              <label style={styles.editLabel}>Target completion
+                <input type="date" value={editForm.target_completion_date || ''} onChange={(e) => setEditForm((s) => ({ ...s, target_completion_date: e.target.value }))} style={styles.input} />
+              </label>
+            </div>
+            <label style={styles.editLabel}>Strategic objective
+              <AutoGrowTextarea value={editForm.strategic_objective} onChange={(e) => setEditForm((s) => ({ ...s, strategic_objective: e.target.value }))} style={styles.textarea} />
+            </label>
+            <label style={styles.editLabel}>Business justification
+              <AutoGrowTextarea value={editForm.business_justification} onChange={(e) => setEditForm((s) => ({ ...s, business_justification: e.target.value }))} style={styles.textarea} />
+            </label>
+            <label style={styles.editLabel}>Expected outcome
+              <AutoGrowTextarea value={editForm.expected_outcome} onChange={(e) => setEditForm((s) => ({ ...s, expected_outcome: e.target.value }))} style={styles.textarea} />
+            </label>
+            <label style={styles.editLabel}>Success criteria
+              <AutoGrowTextarea value={editForm.success_criteria} onChange={(e) => setEditForm((s) => ({ ...s, success_criteria: e.target.value }))} style={styles.textarea} />
+            </label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button type="submit" disabled={busy || !editForm.name.trim()} style={styles.smallBtn}>{busy ? 'Saving…' : 'Save details'}</button>
+              <button type="button" onClick={() => setEditing(false)} disabled={busy} style={styles.smallBtnOutline}>Cancel</button>
+            </div>
+          </form>
+        )}
+
         <div style={styles.peopleRow}>
           <Field label="Sponsor" value={project.sponsor?.full_name || '—'} />
           <Field label="Project manager" value={project.project_manager?.full_name || '—'} />
@@ -414,7 +495,19 @@ export default function ProjectDetail() {
           )}
         </div>
 
-        {pendingStageRequest && (
+        <div style={styles.teamsBlock}>
+          <p style={styles.teamsLabel}>Project members <span style={styles.membersCount}>({projectMembers.length})</span></p>
+          <p style={styles.membersHint}>Everyone on the owning and linked teams. These members can view the project and add tasks.</p>
+          <div style={styles.teamChips}>
+            {projectMembers.length === 0 && <span style={styles.membersEmpty}>No members yet — link a team above.</span>}
+            {projectMembers.map((m) => (
+              <span key={m.id} style={styles.memberChip} title={m.team?.name || ''}>
+                <i className="ti ti-user" style={{ fontSize: 13 }} aria-hidden="true" /> {m.full_name}
+              </span>
+            ))}
+          </div>
+        </div>
+
           <div style={styles.pendingStageBox}>
             <p style={styles.pendingStageTitle}>
               Stage advance requested: {STATUS_LABELS[pendingStageRequest.from_status]} → {STATUS_LABELS[pendingStageRequest.to_status]}
@@ -520,7 +613,7 @@ export default function ProjectDetail() {
               {phaseTasks.length === 0 && <p style={styles.emptySub}>No tasks in this phase yet.</p>}
               {phaseTasks.map((t) => <button key={t.id} type="button" onClick={() => setSelectedTaskId(t.id)} style={styles.phaseTaskRow}><span style={styles.phaseTaskName}>{t.name}</span><span style={styles.phaseTaskMeta}>{t.assignee?.full_name || 'Unassigned'} · {t.status?.replaceAll('_', ' ')}</span></button>)}
             </div>
-            {canEdit && !isTerminal && (
+            {canAddTasks && !isTerminal && (
               <button type="button" onClick={() => setAddTaskPhase(phase)} style={styles.addTaskBtn}>
                 <i className="ti ti-plus" style={{ fontSize: 14 }} aria-hidden="true" /> Add task
               </button>
@@ -628,6 +721,9 @@ const styles = {
     color: 'var(--danger)', borderRadius: 'var(--radius)', cursor: 'pointer',
   },
   confirmBox: { background: 'var(--danger-light)', borderRadius: 'var(--radius)', padding: '14px 16px', marginBottom: 18 },
+  editBox: { background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 16, marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 12 },
+  editTitle: { fontSize: 14, fontWeight: 800, margin: 0, color: 'var(--text)' },
+  editLabel: { fontSize: 12, fontWeight: 700, color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: 5 },
   confirmTitle: { fontSize: 14, fontWeight: 700, color: 'var(--danger)', margin: '0 0 4px' },
   confirmDetail: { fontSize: 12.5, color: 'var(--danger)', margin: '0 0 10px', lineHeight: 1.5 },
   dangerBtn: { fontSize: 13, padding: '8px 14px', borderRadius: 'var(--radius)', border: 'none', background: 'var(--danger)', color: '#fff', fontWeight: 700 },
@@ -679,6 +775,10 @@ const styles = {
   teamsLabel: { fontSize: 11.5, fontWeight: 900, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.03em', margin: '0 0 10px' },
   teamChips: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
   teamChipOwner: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, borderRadius: 999, padding: '5px 11px', background: 'var(--info-light)', color: 'var(--info)', textTransform: 'capitalize' },
+  membersCount: { color: 'var(--text-3)', fontWeight: 600 },
+  membersHint: { fontSize: 11.5, color: 'var(--text-3)', margin: '0 0 10px' },
+  membersEmpty: { fontSize: 12.5, color: 'var(--text-3)' },
+  memberChip: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, borderRadius: 999, padding: '5px 11px', background: 'var(--surface-2)', color: 'var(--text-2)', border: '1px solid var(--border)' },
   teamChip: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, borderRadius: 999, padding: '5px 11px', background: 'var(--surface-2)', color: 'var(--text-2)' },
   teamChipRemove: { border: 'none', background: 'transparent', color: 'var(--text-3)', fontSize: 15, lineHeight: 1, cursor: 'pointer', padding: 0, marginLeft: 2 },
   addTeamForm: { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },

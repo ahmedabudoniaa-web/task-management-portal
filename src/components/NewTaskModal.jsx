@@ -12,6 +12,7 @@ export default function NewTaskModal({ teams, people, projects, lockedProjectId,
   const allowedTeams = availableTeamsForCreation(profile, teams)
   const [teamId, setTeamId] = useState(lockedTeamId || profile.team_id || allowedTeams[0]?.id || '')
   const [projectId, setProjectId] = useState(lockedProjectId || '')
+  const [milestoneId, setMilestoneId] = useState(lockedMilestoneId || '')
   const [assigneeId, setAssigneeId] = useState(profile.id)
   const [targetDate, setTargetDate] = useState('')
   const [priority, setPriority] = useState('medium')
@@ -41,7 +42,7 @@ export default function NewTaskModal({ teams, people, projects, lockedProjectId,
         description,
         teamId,
         projectId: projectId || null,
-        milestoneId: lockedMilestoneId || null,
+        milestoneId: locked ? (lockedMilestoneId || null) : (milestoneId || null),
         ownerId: profile.id,
         assigneeId: assigneeId || null,
         targetDate,
@@ -58,6 +59,8 @@ export default function NewTaskModal({ teams, people, projects, lockedProjectId,
 
   const peopleInTeam = peopleVisibleForTeam(profile, people, teamId)
   const canAssignTeamQueue = isMBM(profile) || isDirector(profile)
+  const selectedPhases = ((projects || []).find((p) => p.id === projectId)?.milestones || [])
+    .slice().sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 
   return (
     <div style={styles.overlay} onClick={onClose}>
@@ -103,13 +106,24 @@ export default function NewTaskModal({ teams, people, projects, lockedProjectId,
           </div>
 
           {!locked && projects && projects.length > 0 && (
-            <label style={styles.labelWide}>
-              Link to project (optional)
-              <select value={projectId} onChange={(e) => setProjectId(e.target.value)} style={styles.input}>
-                <option value="">No project</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </label>
+            <div style={styles.grid2}>
+              <label style={styles.label}>
+                Link to project (optional)
+                <select value={projectId} onChange={(e) => { setProjectId(e.target.value); setMilestoneId('') }} style={styles.input}>
+                  <option value="">No project</option>
+                  {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </label>
+              {projectId && (
+                <label style={styles.label}>
+                  Link to phase
+                  <select value={milestoneId} onChange={(e) => setMilestoneId(e.target.value)} style={styles.input}>
+                    <option value="">No specific phase</option>
+                    {selectedPhases.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </label>
+              )}
+            </div>
           )}
 
           <div style={styles.grid2}>
