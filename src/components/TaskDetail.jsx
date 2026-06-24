@@ -515,11 +515,11 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
-          {dependencies.filter((d) => d.blocked_task.id === task.id).length === 0 && (
+          {dependencies.filter((d) => d.blocked_task?.id === task.id && d.blocking_task).length === 0 && (
             <p style={styles.emptyText}>No blocking dependencies.</p>
           )}
           {dependencies
-            .filter((d) => d.blocked_task.id === task.id)
+            .filter((d) => d.blocked_task?.id === task.id && d.blocking_task)
             .map((d) => (
               <div key={d.id} style={styles.dependencyRow}>
                 <span style={styles.dependencyText}>
@@ -532,7 +532,7 @@ export default function TaskDetail({ taskId, people, allTasks, onClose, onChange
                 )}
               </div>
             ))}
-          {dependencies.filter((d) => d.blocking_task.id === task.id).map((d) => (
+          {dependencies.filter((d) => d.blocking_task?.id === task.id && d.blocked_task).map((d) => (
             <div key={d.id} style={styles.dependencyRow}>
               <span style={styles.dependencyText}>
                 <i className="ti ti-arrow-right" style={{ fontSize: 13, marginRight: 6, color: 'var(--text-3)' }} aria-hidden="true" />
