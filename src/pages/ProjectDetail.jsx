@@ -508,6 +508,7 @@ export default function ProjectDetail() {
           </div>
         </div>
 
+        {pendingStageRequest && (
           <div style={styles.pendingStageBox}>
             <p style={styles.pendingStageTitle}>
               Stage advance requested: {STATUS_LABELS[pendingStageRequest.from_status]} → {STATUS_LABELS[pendingStageRequest.to_status]}
